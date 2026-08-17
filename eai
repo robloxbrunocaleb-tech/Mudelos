@@ -1,1 +1,697 @@
-.
+-- ==========================================
+-- 🕺 MÓDULO DE EMOTES | IMPERIAL HUB
+-- ==========================================
+
+return function(container)
+    local Players = game:GetService("Players")
+    local TweenService = game:GetService("TweenService")
+    local UserInputService = game:GetService("UserInputService")
+    local RunService = game:GetService("RunService")
+    local LocalPlayer = Players.LocalPlayer
+
+    -- ==========================================
+    -- 📋 LISTA DE EMOTES (adicione quantos quiser)
+    -- ==========================================
+    local BASE_EMOTES = {
+        {Name = "Sentar (Custom)", Id = 84954637573318},
+        {Name = "Dance 1", Id = 507771019},
+        {Name = "Dance 2", Id = 507771955},
+        {Name = "Wave", Id = 507770239},
+        {Name = "Point", Id = 507770453},
+        {Name = "Laugh", Id = 507770850},
+        {Name = "Cheer", Id = 507770677},
+        {Name = "Zombie Walk", Id = 616168032},
+        {Name = "Vampire Walk", Id = 1083462077},
+        {Name = "Silly Walk", Id = 616154625},
+        {Name = "Mage Walk", Id = 1083447910},
+        {Name = "Superhero Walk", Id = 616163682},
+        {Name = "Ninja Walk", Id = 656117400},
+        {Name = "Robot Dance", Id = 507766388},
+        {Name = "Shy", Id = 507765644},
+        {Name = "Tilt", Id = 507767195},
+        {Name = "Salute", Id = 507767714},
+        {Name = "Stomp", Id = 507766877},
+        {Name = "Air Guitar", Id = 507766218},
+        {Name = "Karate", Id = 507765192},
+        {Name = "Pray", Id = 507771044},
+        -- 👉 COLOQUE MAIS AQUI
+    }
+
+    -- ==========================================
+    -- 🎮 ESTADO DO SISTEMA
+    -- ==========================================
+    local State = {
+        CurrentTrack = nil,
+        Weight = 1,
+        Speed = 1,
+        WalkWithEmote = false,
+        Freeze = false,
+        WeightMode = "Manual",
+        WeightOscSpeed = 1,
+        WeightPhase = 0,
+
+        -- Novos campos
+        MinWeight = 0,
+        MaxWeight = 1,
+        TimeStart = 0,   -- em segundos (0 = início)
+        TimeEnd = 10,    -- em segundos (10 = padrão)
+        PlayMode = "Normal", -- Normal, Reverse, PauseEnd, ResetEnd
+    }
+
+    local function PlayEmote(id)
+        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if not humanoid then return end
+        local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
+
+        if State.CurrentTrack then
+            pcall(function() State.CurrentTrack:Stop() end)
+            State.CurrentTrack = nil
+        end
+
+        local anim = Instance.new("Animation")
+        anim.AnimationId = "rbxassetid://" .. tostring(id)
+        local success, track = pcall(function() return animator:LoadAnimation(anim) end)
+        if success and track then
+            State.CurrentTrack = track
+            track.Priority = Enum.AnimationPriority.Action
+            track.Looped = (State.PlayMode == "Normal") -- só faz loop se for normal
+            track:Play()
+            track:AdjustWeight(State.Weight)
+            track:AdjustSpeed(State.Freeze and 0 or State.Speed)
+            -- Aplicar modo de reprodução
+            if State.PlayMode == "Reverse" then
+                track:AdjustSpeed(-math.abs(State.Speed))
+            elseif State.PlayMode == "PauseEnd" or State.PlayMode == "ResetEnd" then
+                -- monitoraremos no Heartbeat
+            end
+        end
+    end
+
+    -- Controle de posição da animação
+    RunService.Heartbeat:Connect(function(delta)
+        if State.CurrentTrack and State.CurrentTrack.IsPlaying then
+            local track = State.CurrentTrack
+            -- Limitar posição de tempo
+            if State.TimeStart > 0 and track.TimePosition < State.TimeStart then
+                track.TimePosition = State.TimeStart
+            end
+            if State.TimeEnd > 0 and track.TimePosition > State.TimeEnd then
+                if State.PlayMode == "PauseEnd" then
+                    track:AdjustSpeed(0)
+                elseif State.PlayMode == "ResetEnd" then
+                    track.TimePosition = State.TimeStart or 0
+                else
+                    -- Normal ou Reverse: se passar do fim, volta ao início (se loop)
+                    if track.Looped then
+                        track.TimePosition = State.TimeStart or 0
+                    else
+                        track:Stop()
+                    end
+                end
+            end
+        end
+    end)
+
+    -- Limpeza ao andar
+    RunService.RenderStepped:Connect(function()
+        if not State.WalkWithEmote and State.CurrentTrack and State.CurrentTrack.IsPlaying then
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChildOfClass("Humanoid") then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum.MoveDirection.Magnitude > 0 then
+                    State.CurrentTrack:Stop()
+                    State.CurrentTrack = nil
+                end
+            end
+        end
+    end)
+
+    -- ==========================================
+    -- 🎨 INTERFACE DO MÓDULO
+    -- ==========================================
+    -- Painel de controles à esquerda
+    local Controls = Instance.new("Frame", container)
+    Controls.Size = UDim2.new(0, 170, 1, -10)
+    Controls.Position = UDim2.new(0, 5, 0, 5)
+    Controls.BackgroundColor3 = Color3.fromRGB(22, 28, 38)
+    Controls.BorderSizePixel = 0
+    Controls.Parent = container
+    Instance.new("UICorner", Controls).CornerRadius = UDim.new(0, 8)
+
+    -- Toggle Andar
+    local WalkToggle = Instance.new("TextButton", Controls)
+    WalkToggle.Size = UDim2.new(1, -10, 0, 28)
+    WalkToggle.Position = UDim2.new(0, 5, 0, 10)
+    WalkToggle.BackgroundColor3 = Color3.fromRGB(60, 20, 20)
+    WalkToggle.Text = "PARAR AO ANDAR"
+    WalkToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    WalkToggle.Font = Enum.Font.GothamBold
+    WalkToggle.TextSize = 9
+    WalkToggle.Parent = Controls
+    Instance.new("UICorner", WalkToggle).CornerRadius = UDim.new(0, 4)
+
+    WalkToggle.MouseButton1Click:Connect(function()
+        State.WalkWithEmote = not State.WalkWithEmote
+        WalkToggle.BackgroundColor3 = State.WalkWithEmote and Color3.fromRGB(20, 80, 40) or Color3.fromRGB(60, 20, 20)
+        WalkToggle.Text = State.WalkWithEmote and "ANDAR COM EMOTE" or "PARAR AO ANDAR"
+    end)
+
+    -- Velocidade
+    local SpeedLabel = Instance.new("TextLabel", Controls)
+    SpeedLabel.Size = UDim2.new(1, -10, 0, 15)
+    SpeedLabel.Position = UDim2.new(0, 5, 0, 50)
+    SpeedLabel.BackgroundTransparency = 1
+    SpeedLabel.Text = "VELOCIDADE: 1.0x"
+    SpeedLabel.TextColor3 = Color3.fromRGB(220, 225, 235)
+    SpeedLabel.Font = Enum.Font.GothamBold
+    SpeedLabel.TextSize = 10
+    SpeedLabel.Parent = Controls
+
+    local SpeedBar = Instance.new("Frame", Controls)
+    SpeedBar.Size = UDim2.new(1, -20, 0, 4)
+    SpeedBar.Position = UDim2.new(0, 10, 0, 70)
+    SpeedBar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    SpeedBar.Parent = Controls
+    Instance.new("UICorner", SpeedBar).CornerRadius = UDim.new(1, 0)
+
+    local SpeedBall = Instance.new("TextButton", SpeedBar)
+    SpeedBall.Size = UDim2.new(0, 16, 0, 16)
+    SpeedBall.Position = UDim2.new(0.2, -8, 0.5, -8)
+    SpeedBall.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
+    SpeedBall.Text = ""
+    SpeedBall.Parent = SpeedBar
+    Instance.new("UICorner", SpeedBall).CornerRadius = UDim.new(1, 0)
+
+    local draggingSpeed = false
+    SpeedBall.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingSpeed = true end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if draggingSpeed and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local relativeX = math.clamp(input.Position.X - SpeedBar.AbsolutePosition.X, 0, SpeedBar.AbsoluteSize.X)
+            local percentage = relativeX / SpeedBar.AbsoluteSize.X
+            SpeedBall.Position = UDim2.new(percentage, -8, 0.5, -8)
+            State.Speed = percentage * 5
+            SpeedLabel.Text = string.format("VELOCIDADE: %.1fx", State.Speed)
+            if State.CurrentTrack then pcall(function() State.CurrentTrack:AdjustSpeed(State.Speed) end) end
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingSpeed = false end
+    end)
+
+    -- Weight (slider)
+    local WeightLabel = Instance.new("TextLabel", Controls)
+    WeightLabel.Size = UDim2.new(1, -10, 0, 15)
+    WeightLabel.Position = UDim2.new(0, 5, 0, 90)
+    WeightLabel.BackgroundTransparency = 1
+    WeightLabel.Text = "WEIGHT: 100% (Manual)"
+    WeightLabel.TextColor3 = Color3.fromRGB(220, 225, 235)
+    WeightLabel.Font = Enum.Font.GothamBold
+    WeightLabel.TextSize = 10
+    WeightLabel.Parent = Controls
+
+    local WeightBar = Instance.new("Frame", Controls)
+    WeightBar.Size = UDim2.new(1, -20, 0, 4)
+    WeightBar.Position = UDim2.new(0, 10, 0, 110)
+    WeightBar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    WeightBar.Parent = Controls
+    Instance.new("UICorner", WeightBar).CornerRadius = UDim.new(1, 0)
+
+    local WeightBall = Instance.new("TextButton", WeightBar)
+    WeightBall.Size = UDim2.new(0, 16, 0, 16)
+    WeightBall.Position = UDim2.new(1, -8, 0.5, -8)
+    WeightBall.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    WeightBall.Text = ""
+    WeightBall.Parent = WeightBar
+    Instance.new("UICorner", WeightBall).CornerRadius = UDim.new(1, 0)
+
+    local draggingWeight = false
+    WeightBall.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingWeight = true
+            State.WeightMode = "Manual"
+            WeightLabel.Text = "WEIGHT: " .. math.floor(State.Weight * 100) .. "% (Manual)"
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if draggingWeight and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local relativeX = math.clamp(input.Position.X - WeightBar.AbsolutePosition.X, 0, WeightBar.AbsoluteSize.X)
+            local percentage = relativeX / WeightBar.AbsoluteSize.X
+            WeightBall.Position = UDim2.new(percentage, -8, 0.5, -8)
+            State.Weight = percentage
+            WeightLabel.Text = "WEIGHT: " .. math.floor(percentage * 100) .. "% (Manual)"
+            if State.CurrentTrack then pcall(function() State.CurrentTrack:AdjustWeight(State.Weight) end) end
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingWeight = false end
+    end)
+
+    -- Botões para definir limites de weight
+    local function CreateSetWeightButton(text, posX, posY, target)
+        local btn = Instance.new("TextButton", Controls)
+        btn.Size = UDim2.new(0.45, 0, 0, 22)
+        btn.Position = UDim2.new(posX, 0, posY, 0)
+        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+        btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(220, 225, 235)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 9
+        btn.Parent = Controls
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+        btn.MouseButton1Click:Connect(function()
+            if target == "min" then
+                State.MinWeight = State.Weight
+                btn.Text = "MÍN: " .. math.floor(State.MinWeight * 100) .. "%"
+            else
+                State.MaxWeight = State.Weight
+                btn.Text = "MÁX: " .. math.floor(State.MaxWeight * 100) .. "%"
+            end
+        end)
+        return btn
+    end
+
+    CreateSetWeightButton("DEF. MÍN", 0.025, 130, "min")
+    CreateSetWeightButton("DEF. MÁX", 0.525, 130, "max")
+
+    -- Modos de weight
+    local function CreateModeButton(text, posX, posY, mode)
+        local btn = Instance.new("TextButton", Controls)
+        btn.Size = UDim2.new(0.45, 0, 0, 22)
+        btn.Position = UDim2.new(posX, 0, posY, 0)
+        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+        btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(220, 225, 235)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 9
+        btn.Parent = Controls
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+        btn.MouseButton1Click:Connect(function()
+            State.WeightMode = mode
+            if mode == "Manual" then
+                WeightLabel.Text = "WEIGHT: " .. math.floor(State.Weight * 100) .. "% (Manual)"
+            else
+                WeightLabel.Text = "WEIGHT: " .. mode:upper()
+            end
+        end)
+        return btn
+    end
+
+    CreateModeButton("SUBIR", 0.025, 156, "Up")
+    CreateModeButton("DESCER", 0.525, 156, "Down")
+    CreateModeButton("LOOP", 0.025, 182, "Loop")
+    CreateModeButton("MANUAL", 0.525, 182, "Manual")
+
+    -- Velocidade de oscilação
+    local OscSpeedLabel = Instance.new("TextLabel", Controls)
+    OscSpeedLabel.Size = UDim2.new(1, -10, 0, 15)
+    OscSpeedLabel.Position = UDim2.new(0, 5, 0, 210)
+    OscSpeedLabel.BackgroundTransparency = 1
+    OscSpeedLabel.Text = "VEL. OSC: 1.0x"
+    OscSpeedLabel.TextColor3 = Color3.fromRGB(220, 225, 235)
+    OscSpeedLabel.Font = Enum.Font.GothamBold
+    OscSpeedLabel.TextSize = 10
+    OscSpeedLabel.Parent = Controls
+
+    local OscSpeedBar = Instance.new("Frame", Controls)
+    OscSpeedBar.Size = UDim2.new(1, -20, 0, 4)
+    OscSpeedBar.Position = UDim2.new(0, 10, 0, 230)
+    OscSpeedBar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    OscSpeedBar.Parent = Controls
+    Instance.new("UICorner", OscSpeedBar).CornerRadius = UDim.new(1, 0)
+
+    local OscSpeedBall = Instance.new("TextButton", OscSpeedBar)
+    OscSpeedBall.Size = UDim2.new(0, 16, 0, 16)
+    OscSpeedBall.Position = UDim2.new(0.5, -8, 0.5, -8)
+    OscSpeedBall.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+    OscSpeedBall.Text = ""
+    OscSpeedBall.Parent = OscSpeedBar
+    Instance.new("UICorner", OscSpeedBall).CornerRadius = UDim.new(1, 0)
+
+    local draggingOscSpeed = false
+    OscSpeedBall.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingOscSpeed = true end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if draggingOscSpeed and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local relativeX = math.clamp(input.Position.X - OscSpeedBar.AbsolutePosition.X, 0, OscSpeedBar.AbsoluteSize.X)
+            local percentage = relativeX / OscSpeedBar.AbsoluteSize.X
+            OscSpeedBall.Position = UDim2.new(percentage, -8, 0.5, -8)
+            State.WeightOscSpeed = percentage * 5
+            OscSpeedLabel.Text = string.format("VEL. OSC: %.1fx", State.WeightOscSpeed)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingOscSpeed = false end
+    end)
+
+    -- Controles de tempo da animação
+    local TimeStartLabel = Instance.new("TextLabel", Controls)
+    TimeStartLabel.Size = UDim2.new(0.45, 0, 0, 15)
+    TimeStartLabel.Position = UDim2.new(0.025, 0, 0, 255)
+    TimeStartLabel.BackgroundTransparency = 1
+    TimeStartLabel.Text = "INÍCIO (s): 0"
+    TimeStartLabel.TextColor3 = Color3.fromRGB(220, 225, 235)
+    TimeStartLabel.Font = Enum.Font.GothamBold
+    TimeStartLabel.TextSize = 9
+    TimeStartLabel.Parent = Controls
+
+    local TimeEndLabel = Instance.new("TextLabel", Controls)
+    TimeEndLabel.Size = UDim2.new(0.45, 0, 0, 15)
+    TimeEndLabel.Position = UDim2.new(0.525, 0, 0, 255)
+    TimeEndLabel.BackgroundTransparency = 1
+    TimeEndLabel.Text = "FIM (s): 10"
+    TimeEndLabel.TextColor3 = Color3.fromRGB(220, 225, 235)
+    TimeEndLabel.Font = Enum.Font.GothamBold
+    TimeEndLabel.TextSize = 9
+    TimeEndLabel.Parent = Controls
+
+    local TimeStartBox = Instance.new("TextBox", Controls)
+    TimeStartBox.Size = UDim2.new(0.45, 0, 0, 20)
+    TimeStartBox.Position = UDim2.new(0.025, 0, 0, 270)
+    TimeStartBox.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    TimeStartBox.Text = "0"
+    TimeStartBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TimeStartBox.Font = Enum.Font.Gotham
+    TimeStartBox.TextSize = 10
+    TimeStartBox.Parent = Controls
+    Instance.new("UICorner", TimeStartBox).CornerRadius = UDim.new(0, 4)
+
+    local TimeEndBox = Instance.new("TextBox", Controls)
+    TimeEndBox.Size = UDim2.new(0.45, 0, 0, 20)
+    TimeEndBox.Position = UDim2.new(0.525, 0, 0, 270)
+    TimeEndBox.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    TimeEndBox.Text = "10"
+    TimeEndBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TimeEndBox.Font = Enum.Font.Gotham
+    TimeEndBox.TextSize = 10
+    TimeEndBox.Parent = Controls
+    Instance.new("UICorner", TimeEndBox).CornerRadius = UDim.new(0, 4)
+
+    TimeStartBox.FocusLost:Connect(function()
+        State.TimeStart = tonumber(TimeStartBox.Text) or 0
+        TimeStartLabel.Text = "INÍCIO (s): " .. State.TimeStart
+    end)
+    TimeEndBox.FocusLost:Connect(function()
+        State.TimeEnd = tonumber(TimeEndBox.Text) or 10
+        TimeEndLabel.Text = "FIM (s): " .. State.TimeEnd
+    end)
+
+    -- Modo de reprodução
+    local function CreatePlayModeButton(text, posY, mode)
+        local btn = Instance.new("TextButton", Controls)
+        btn.Size = UDim2.new(1, -10, 0, 22)
+        btn.Position = UDim2.new(0, 5, 0, posY)
+        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+        btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(220, 225, 235)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 9
+        btn.Parent = Controls
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+        btn.MouseButton1Click:Connect(function()
+            State.PlayMode = mode
+        end)
+        return btn
+    end
+
+    CreatePlayModeButton("▶ NORMAL", 295, "Normal")
+    CreatePlayModeButton("◀ REVERSO", 320, "Reverse")
+    CreatePlayModeButton("⏸ PAUSAR NO FIM", 345, "PauseEnd")
+    CreatePlayModeButton("🔄 VOLTAR INÍCIO", 370, "ResetEnd")
+
+    -- Freeze Frame
+    local FreezeBtn = Instance.new("TextButton", Controls)
+    FreezeBtn.Size = UDim2.new(1, -10, 0, 25)
+    FreezeBtn.Position = UDim2.new(0, 5, 0, 395)
+    FreezeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    FreezeBtn.Text = "❄️ FREEZE: OFF"
+    FreezeBtn.TextColor3 = Color3.fromRGB(220, 225, 235)
+    FreezeBtn.Font = Enum.Font.GothamBold
+    FreezeBtn.TextSize = 9
+    FreezeBtn.Parent = Controls
+    Instance.new("UICorner", FreezeBtn).CornerRadius = UDim.new(0, 4)
+
+    FreezeBtn.MouseButton1Click:Connect(function()
+        State.Freeze = not State.Freeze
+        FreezeBtn.BackgroundColor3 = State.Freeze and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(40, 40, 60)
+        FreezeBtn.Text = State.Freeze and "❄️ FREEZE: ON" or "❄️ FREEZE: OFF"
+        if State.CurrentTrack then
+            pcall(function() State.CurrentTrack:AdjustSpeed(State.Freeze and 0 or State.Speed) end)
+        end
+    end)
+
+    -- ==========================================
+    -- 🔍 BUSCA E PAGINAÇÃO DE EMOTES
+    -- ==========================================
+    local SearchEmote = Instance.new("TextBox", container)
+    SearchEmote.Size = UDim2.new(1, -180, 0, 30)
+    SearchEmote.Position = UDim2.new(0, 175, 0, -35)
+    SearchEmote.BackgroundColor3 = Color3.fromRGB(22, 28, 38)
+    SearchEmote.PlaceholderText = "🔍 Pesquisar emote ou colar link/ID..."
+    SearchEmote.TextColor3 = Color3.fromRGB(255, 255, 255)
+    SearchEmote.Font = Enum.Font.Gotham
+    SearchEmote.TextSize = 10
+    SearchEmote.Parent = container
+    Instance.new("UICorner", SearchEmote).CornerRadius = UDim.new(0, 4)
+
+    -- Grid de emotes
+    local EmoteGrid = Instance.new("ScrollingFrame", container)
+    EmoteGrid.Size = UDim2.new(1, -180, 1, -10)
+    EmoteGrid.Position = UDim2.new(0, 175, 0, 5)
+    EmoteGrid.BackgroundTransparency = 1
+    EmoteGrid.ScrollBarThickness = 3
+    EmoteGrid.Parent = container
+
+    local Grid = Instance.new("UIGridLayout", EmoteGrid)
+    Grid.CellSize = UDim2.new(0, 155, 0, 160)
+    Grid.CellPadding = UDim2.new(0, 8, 0, 8)
+    Grid.HorizontalAlignment = Enum.HorizontalAlignment.Left
+
+    -- Paginação
+    local ITENS_POR_PAGINA = 5
+    local paginaAtual = 1
+    local emoteListaFiltrada = {}
+
+    local function AtualizarPagina()
+        -- limpa o grid
+        for _, child in ipairs(EmoteGrid:GetChildren()) do
+            if child:IsA("Frame") then child:Destroy() end
+        end
+
+        local inicio = (paginaAtual - 1) * ITENS_POR_PAGINA + 1
+        local fim = math.min(inicio + ITENS_POR_PAGINA - 1, #emoteListaFiltrada)
+
+        local itens = 0
+        for i = inicio, fim do
+            local emote = emoteListaFiltrada[i]
+            if emote then
+                itens = itens + 1
+                local Card = Instance.new("Frame", EmoteGrid)
+                Card.Size = UDim2.new(1, 0, 1, 0)
+                Card.BackgroundColor3 = Color3.fromRGB(22, 28, 38)
+                Card.Parent = EmoteGrid
+                Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 8)
+
+                local Thumb = Instance.new("ImageLabel", Card)
+                Thumb.Size = UDim2.new(1, -10, 0, 90)
+                Thumb.Position = UDim2.new(0, 5, 0, 5)
+                Thumb.BackgroundColor3 = Color3.fromRGB(30, 35, 45)
+                Thumb.Image = "rbxthumb://type=Asset&id=" .. emote.Id .. "&w=140&h=140"
+                Thumb.Parent = Card
+                Instance.new("UICorner", Thumb).CornerRadius = UDim.new(0, 6)
+
+                local Label = Instance.new("TextLabel", Card)
+                Label.Size = UDim2.new(1, -10, 0, 20)
+                Label.Position = UDim2.new(0, 5, 0, 100)
+                Label.BackgroundTransparency = 1
+                Label.Text = emote.Name
+                Label.TextColor3 = Color3.fromRGB(220, 225, 235)
+                Label.Font = Enum.Font.GothamBold
+                Label.TextSize = 9
+                Label.TextTruncate = Enum.TextTruncate.AtEnd
+                Label.Parent = Card
+
+                local PlayBtn = Instance.new("TextButton", Card)
+                PlayBtn.Size = UDim2.new(1, -10, 0, 20)
+                PlayBtn.Position = UDim2.new(0, 5, 0, 120)
+                PlayBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
+                PlayBtn.Text = "▶ ATIVAR"
+                PlayBtn.TextColor3 = Color3.fromRGB(255,255,255)
+                PlayBtn.Font = Enum.Font.GothamBold
+                PlayBtn.TextSize = 9
+                PlayBtn.Parent = Card
+                Instance.new("UICorner", PlayBtn).CornerRadius = UDim.new(0, 4)
+                PlayBtn.MouseButton1Click:Connect(function() PlayEmote(emote.Id) end)
+
+                -- Botão favoritar
+                local StarBtn = Instance.new("TextButton", Card)
+                StarBtn.Size = UDim2.new(0, 20, 0, 20)
+                StarBtn.Position = UDim2.new(1, -25, 0, 5)
+                StarBtn.BackgroundColor3 = Color3.fromRGB(40, 45, 55)
+                StarBtn.Text = "⭐"
+                StarBtn.TextSize = 10
+                StarBtn.Parent = Card
+                Instance.new("UICorner", StarBtn).CornerRadius = UDim.new(0, 4)
+                StarBtn.MouseButton1Click:Connect(function()
+                    -- Criar popup de nome
+                    local Popup = Instance.new("Frame", container)
+                    Popup.Size = UDim2.new(0, 300, 0, 80)
+                    Popup.Position = UDim2.new(0.5, -150, 0.5, -40)
+                    Popup.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+                    Popup.BorderSizePixel = 0
+                    Popup.Parent = container
+                    Instance.new("UICorner", Popup).CornerRadius = UDim.new(0, 10)
+                    Instance.new("UIStroke", Popup).Color = Color3.fromRGB(60, 140, 255)
+
+                    local NomeBox = Instance.new("TextBox", Popup)
+                    NomeBox.Size = UDim2.new(1, -20, 0, 30)
+                    NomeBox.Position = UDim2.new(0, 10, 0, 10)
+                    NomeBox.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+                    NomeBox.Text = emote.Name
+                    NomeBox.TextColor3 = Color3.fromRGB(255,255,255)
+                    NomeBox.Font = Enum.Font.Gotham
+                    NomeBox.TextSize = 12
+                    NomeBox.Parent = Popup
+                    Instance.new("UICorner", NomeBox).CornerRadius = UDim.new(0, 4)
+
+                    local SalvarBtn = Instance.new("TextButton", Popup)
+                    SalvarBtn.Size = UDim2.new(0, 130, 0, 25)
+                    SalvarBtn.Position = UDim2.new(0, 10, 0, 45)
+                    SalvarBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
+                    SalvarBtn.Text = "SALVAR"
+                    SalvarBtn.TextColor3 = Color3.fromRGB(255,255,255)
+                    SalvarBtn.Font = Enum.Font.GothamBold
+                    SalvarBtn.TextSize = 11
+                    SalvarBtn.Parent = Popup
+                    Instance.new("UICorner", SalvarBtn).CornerRadius = UDim.new(0, 4)
+
+                    local CancelarBtn = Instance.new("TextButton", Popup)
+                    CancelarBtn.Size = UDim2.new(0, 130, 0, 25)
+                    CancelarBtn.Position = UDim2.new(0, 160, 0, 45)
+                    CancelarBtn.BackgroundColor3 = Color3.fromRGB(100, 50, 50)
+                    CancelarBtn.Text = "CANCELAR"
+                    CancelarBtn.TextColor3 = Color3.fromRGB(255,255,255)
+                    CancelarBtn.Font = Enum.Font.GothamBold
+                    CancelarBtn.TextSize = 11
+                    CancelarBtn.Parent = Popup
+                    Instance.new("UICorner", CancelarBtn).CornerRadius = UDim.new(0, 4)
+
+                    SalvarBtn.MouseButton1Click:Connect(function()
+                        local nome = NomeBox.Text
+                        local file = "emote_favoritos.txt"
+                        local sucesso, conteudo = pcall(readfile, file)
+                        if not sucesso then conteudo = "" end
+                        if not string.find(conteudo, emote.Id) then
+                            pcall(writefile, file, conteudo .. nome .. ";" .. emote.Id .. "\n")
+                        end
+                        Popup:Destroy()
+                    end)
+                    CancelarBtn.MouseButton1Click:Connect(function() Popup:Destroy() end)
+                end)
+            end
+        end
+
+        -- Atualizar canvas
+        local rows = math.ceil(itens / 1) -- uma coluna (5 itens empilhados)
+        EmoteGrid.CanvasSize = UDim2.new(0, 0, 0, rows * (160 + 8) + 10)
+    end
+
+    -- Botões de página (fora do grid, mas na mesma área)
+    local PageInfo = Instance.new("TextLabel", container)
+    PageInfo.Size = UDim2.new(0, 100, 0, 20)
+    PageInfo.Position = UDim2.new(0, 175, 0, -35)
+    PageInfo.BackgroundTransparency = 1
+    PageInfo.Text = "1/1"
+    PageInfo.TextColor3 = Color3.fromRGB(220, 225, 235)
+    PageInfo.Font = Enum.Font.GothamBold
+    PageInfo.TextSize = 12
+    PageInfo.Parent = container
+
+    local PrevBtn = Instance.new("TextButton", container)
+    PrevBtn.Size = UDim2.new(0, 40, 0, 25)
+    PrevBtn.Position = UDim2.new(0, 175, 1, -30)
+    PrevBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    PrevBtn.Text = "◀"
+    PrevBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    PrevBtn.Font = Enum.Font.GothamBold
+    PrevBtn.TextSize = 14
+    PrevBtn.Parent = container
+    Instance.new("UICorner", PrevBtn).CornerRadius = UDim.new(0, 4)
+
+    local NextBtn = Instance.new("TextButton", container)
+    NextBtn.Size = UDim2.new(0, 40, 0, 25)
+    NextBtn.Position = UDim2.new(1, -40, 1, -30)
+    NextBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    NextBtn.Text = "▶"
+    NextBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    NextBtn.Font = Enum.Font.GothamBold
+    NextBtn.TextSize = 14
+    NextBtn.Parent = container
+    Instance.new("UICorner", NextBtn).CornerRadius = UDim.new(0, 4)
+
+    PrevBtn.MouseButton1Click:Connect(function()
+        if paginaAtual > 1 then
+            paginaAtual -= 1
+            AtualizarPagina()
+            PageInfo.Text = paginaAtual .. "/" .. math.max(1, math.ceil(#emoteListaFiltrada / ITENS_POR_PAGINA))
+        end
+    end)
+    NextBtn.MouseButton1Click:Connect(function()
+        local totalPaginas = math.max(1, math.ceil(#emoteListaFiltrada / ITENS_POR_PAGINA))
+        if paginaAtual < totalPaginas then
+            paginaAtual += 1
+            AtualizarPagina()
+            PageInfo.Text = paginaAtual .. "/" .. totalPaginas
+        end
+    end)
+
+    -- Função de busca e filtro
+    local function BuscarEmotes(texto)
+        emoteListaFiltrada = {}
+        if string.find(texto, "roblox.com") then
+            local id = tonumber(string.match(texto, "%d+"))
+            if id then
+                table.insert(emoteListaFiltrada, {Name = "Custom Link", Id = id})
+            end
+        elseif tonumber(texto) then
+            table.insert(emoteListaFiltrada, {Name = "ID " .. texto, Id = tonumber(texto)})
+        else
+            for _, emote in ipairs(BASE_EMOTES) do
+                if texto == "" or string.find(string.lower(emote.Name), string.lower(texto)) then
+                    table.insert(emoteListaFiltrada, emote)
+                end
+            end
+        end
+        paginaAtual = 1
+        AtualizarPagina()
+        local totalPaginas = math.max(1, math.ceil(#emoteListaFiltrada / ITENS_POR_PAGINA))
+        PageInfo.Text = "1/" .. totalPaginas
+    end
+
+    SearchEmote:GetPropertyChangedSignal("Text"):Connect(function()
+        BuscarEmotes(SearchEmote.Text)
+    end)
+
+    -- Auto-atualizar Weight em modos automáticos
+    RunService.Heartbeat:Connect(function(delta)
+        if State.WeightMode ~= "Manual" and State.CurrentTrack then
+            local speed = State.WeightOscSpeed
+            if State.WeightMode == "Up" then
+                State.Weight = math.min(State.MaxWeight, State.Weight + delta * speed)
+            elseif State.WeightMode == "Down" then
+                State.Weight = math.max(State.MinWeight, State.Weight - delta * speed)
+            elseif State.WeightMode == "Loop" then
+                State.WeightPhase = State.WeightPhase + delta * speed
+                State.Weight = State.MinWeight + ((State.MaxWeight - State.MinWeight) * (math.sin(State.WeightPhase) + 1) / 2)
+            end
+            WeightBall.Position = UDim2.new(State.Weight, -8, 0.5, -8)
+            pcall(function() State.CurrentTrack:AdjustWeight(State.Weight) end)
+        end
+    end)
+
+    -- Inicializar lista
+    BuscarEmotes("")
+end
