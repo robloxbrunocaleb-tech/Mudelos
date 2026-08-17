@@ -1,5 +1,5 @@
 -- ==========================================
--- 🕺 MÓDULO DE EMOTES | IMPERIAL HUB
+-- 🕺 MÓDULO DE EMOTES | IMPERIAL HUB (GOD)
 -- ==========================================
 
 return function(container)
@@ -10,7 +10,7 @@ return function(container)
     local LocalPlayer = Players.LocalPlayer
 
     -- ==========================================
-    -- 📋 LISTA DE EMOTES (adicione quantos quiser)
+    -- 📋 LISTA DE EMOTES (pode adicionar mais)
     -- ==========================================
     local BASE_EMOTES = {
         {Name = "Sentar (Custom)", Id = 84954637573318},
@@ -34,7 +34,7 @@ return function(container)
         {Name = "Air Guitar", Id = 507766218},
         {Name = "Karate", Id = 507765192},
         {Name = "Pray", Id = 507771044},
-        -- 👉 COLOQUE MAIS AQUI
+        -- adicione mais
     }
 
     -- ==========================================
@@ -46,18 +46,19 @@ return function(container)
         Speed = 1,
         WalkWithEmote = false,
         Freeze = false,
-        WeightMode = "Manual",
+        WeightMode = "Manual",   -- "Manual", "Up", "Down", "Loop"
         WeightOscSpeed = 1,
         WeightPhase = 0,
-
-        -- Novos campos
         MinWeight = 0,
         MaxWeight = 1,
-        TimeStart = 0,   -- em segundos (0 = início)
-        TimeEnd = 10,    -- em segundos (10 = padrão)
-        PlayMode = "Normal", -- Normal, Reverse, PauseEnd, ResetEnd
+        TimeStart = 0,
+        TimeEnd = 10,             -- segundos
+        PlayMode = "Normal",      -- "Normal", "Reverse", "PauseEnd", "ResetEnd"
     }
 
+    -- ==========================================
+    -- ▶️ FUNÇÃO PARA TOCAR EMOTE
+    -- ==========================================
     local function PlayEmote(id)
         local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
         local humanoid = char:FindFirstChildOfClass("Humanoid")
@@ -75,45 +76,50 @@ return function(container)
         if success and track then
             State.CurrentTrack = track
             track.Priority = Enum.AnimationPriority.Action
-            track.Looped = (State.PlayMode == "Normal") -- só faz loop se for normal
+            track.Looped = (State.PlayMode == "Normal") -- apenas loop no modo normal
             track:Play()
             track:AdjustWeight(State.Weight)
             track:AdjustSpeed(State.Freeze and 0 or State.Speed)
+
             -- Aplicar modo de reprodução
             if State.PlayMode == "Reverse" then
                 track:AdjustSpeed(-math.abs(State.Speed))
-            elseif State.PlayMode == "PauseEnd" or State.PlayMode == "ResetEnd" then
-                -- monitoraremos no Heartbeat
             end
         end
     end
 
-    -- Controle de posição da animação
+    -- ==========================================
+    -- ⏱️ CONTROLE DE TEMPO / LOOP AUTOMÁTICO
+    -- ==========================================
     RunService.Heartbeat:Connect(function(delta)
         if State.CurrentTrack and State.CurrentTrack.IsPlaying then
             local track = State.CurrentTrack
+
             -- Limitar posição de tempo
             if State.TimeStart > 0 and track.TimePosition < State.TimeStart then
                 track.TimePosition = State.TimeStart
             end
             if State.TimeEnd > 0 and track.TimePosition > State.TimeEnd then
                 if State.PlayMode == "PauseEnd" then
-                    track:AdjustSpeed(0)
+                    track:AdjustSpeed(0) -- pausa no fim
                 elseif State.PlayMode == "ResetEnd" then
                     track.TimePosition = State.TimeStart or 0
                 else
-                    -- Normal ou Reverse: se passar do fim, volta ao início (se loop)
+                    -- Normal ou Reverse
                     if track.Looped then
                         track.TimePosition = State.TimeStart or 0
                     else
                         track:Stop()
+                        State.CurrentTrack = nil
                     end
                 end
             end
         end
     end)
 
-    -- Limpeza ao andar
+    -- ==========================================
+    -- 🧹 PARAR EMOTE AO ANDAR
+    -- ==========================================
     RunService.RenderStepped:Connect(function()
         if not State.WalkWithEmote and State.CurrentTrack and State.CurrentTrack.IsPlaying then
             local char = LocalPlayer.Character
@@ -130,103 +136,122 @@ return function(container)
     -- ==========================================
     -- 🎨 INTERFACE DO MÓDULO
     -- ==========================================
-    -- Painel de controles à esquerda
-    local Controls = Instance.new("Frame", container)
-    Controls.Size = UDim2.new(0, 170, 1, -10)
-    Controls.Position = UDim2.new(0, 5, 0, 5)
-    Controls.BackgroundColor3 = Color3.fromRGB(22, 28, 38)
-    Controls.BorderSizePixel = 0
-    Controls.Parent = container
-    Instance.new("UICorner", Controls).CornerRadius = UDim.new(0, 8)
+    -- Painel de controles (esquerda) com rolagem
+    local ControlsScroll = Instance.new("ScrollingFrame", container)
+    ControlsScroll.Size = UDim2.new(0, 200, 1, -10)
+    ControlsScroll.Position = UDim2.new(0, 5, 0, 5)
+    ControlsScroll.BackgroundTransparency = 1
+    ControlsScroll.ScrollBarThickness = 3
+    ControlsScroll.BorderSizePixel = 0
+    ControlsScroll.Parent = container
+
+    local ControlsList = Instance.new("UIListLayout", ControlsScroll)
+    ControlsList.Padding = UDim.new(0, 6)
+
+    -- Função auxiliar para criar botão
+    local function CreateButton(parent, text, posY, callback)
+        local btn = Instance.new("TextButton", parent)
+        btn.Size = UDim2.new(1, -10, 0, 30)
+        btn.Position = UDim2.new(0, 5, 0, posY)
+        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+        btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 11
+        btn.Parent = parent
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
+        if callback then btn.MouseButton1Click:Connect(callback) end
+        return btn
+    end
 
     -- Toggle Andar
-    local WalkToggle = Instance.new("TextButton", Controls)
-    WalkToggle.Size = UDim2.new(1, -10, 0, 28)
-    WalkToggle.Position = UDim2.new(0, 5, 0, 10)
-    WalkToggle.BackgroundColor3 = Color3.fromRGB(60, 20, 20)
-    WalkToggle.Text = "PARAR AO ANDAR"
-    WalkToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    WalkToggle.Font = Enum.Font.GothamBold
-    WalkToggle.TextSize = 9
-    WalkToggle.Parent = Controls
-    Instance.new("UICorner", WalkToggle).CornerRadius = UDim.new(0, 4)
-
-    WalkToggle.MouseButton1Click:Connect(function()
+    local WalkToggle = CreateButton(ControlsScroll, "PARAR AO ANDAR", 10, function()
         State.WalkWithEmote = not State.WalkWithEmote
         WalkToggle.BackgroundColor3 = State.WalkWithEmote and Color3.fromRGB(20, 80, 40) or Color3.fromRGB(60, 20, 20)
         WalkToggle.Text = State.WalkWithEmote and "ANDAR COM EMOTE" or "PARAR AO ANDAR"
     end)
+    WalkToggle.BackgroundColor3 = Color3.fromRGB(60, 20, 20)
 
     -- Velocidade
-    local SpeedLabel = Instance.new("TextLabel", Controls)
-    SpeedLabel.Size = UDim2.new(1, -10, 0, 15)
+    local SpeedLabel = Instance.new("TextLabel", ControlsScroll)
+    SpeedLabel.Size = UDim2.new(1, -10, 0, 18)
     SpeedLabel.Position = UDim2.new(0, 5, 0, 50)
     SpeedLabel.BackgroundTransparency = 1
     SpeedLabel.Text = "VELOCIDADE: 1.0x"
     SpeedLabel.TextColor3 = Color3.fromRGB(220, 225, 235)
     SpeedLabel.Font = Enum.Font.GothamBold
-    SpeedLabel.TextSize = 10
-    SpeedLabel.Parent = Controls
+    SpeedLabel.TextSize = 11
+    SpeedLabel.Parent = ControlsScroll
 
-    local SpeedBar = Instance.new("Frame", Controls)
-    SpeedBar.Size = UDim2.new(1, -20, 0, 4)
-    SpeedBar.Position = UDim2.new(0, 10, 0, 70)
+    local SpeedBar = Instance.new("Frame", ControlsScroll)
+    SpeedBar.Size = UDim2.new(1, -20, 0, 6)
+    SpeedBar.Position = UDim2.new(0, 10, 0, 72)
     SpeedBar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    SpeedBar.Parent = Controls
+    SpeedBar.Parent = ControlsScroll
     Instance.new("UICorner", SpeedBar).CornerRadius = UDim.new(1, 0)
 
     local SpeedBall = Instance.new("TextButton", SpeedBar)
-    SpeedBall.Size = UDim2.new(0, 16, 0, 16)
-    SpeedBall.Position = UDim2.new(0.2, -8, 0.5, -8)
+    SpeedBall.Size = UDim2.new(0, 18, 0, 18)
+    SpeedBall.Position = UDim2.new(0.2, -9, 0.5, -9)
     SpeedBall.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
     SpeedBall.Text = ""
     SpeedBall.Parent = SpeedBar
     Instance.new("UICorner", SpeedBall).CornerRadius = UDim.new(1, 0)
 
+    -- Lógica de arrastar Speed
     local draggingSpeed = false
     SpeedBall.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingSpeed = true end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingSpeed = true
+        end
     end)
     UserInputService.InputChanged:Connect(function(input)
         if draggingSpeed and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local relativeX = math.clamp(input.Position.X - SpeedBar.AbsolutePosition.X, 0, SpeedBar.AbsoluteSize.X)
-            local percentage = relativeX / SpeedBar.AbsoluteSize.X
-            SpeedBall.Position = UDim2.new(percentage, -8, 0.5, -8)
+            local barPos = SpeedBar.AbsolutePosition
+            local barSize = SpeedBar.AbsoluteSize
+            local relativeX = math.clamp(input.Position.X - barPos.X, 0, barSize.X)
+            local percentage = relativeX / barSize.X
+            SpeedBall.Position = UDim2.new(percentage, -9, 0.5, -9)
             State.Speed = percentage * 5
             SpeedLabel.Text = string.format("VELOCIDADE: %.1fx", State.Speed)
-            if State.CurrentTrack then pcall(function() State.CurrentTrack:AdjustSpeed(State.Speed) end) end
+            if State.CurrentTrack then
+                pcall(function() State.CurrentTrack:AdjustSpeed(State.Freeze and 0 or State.Speed) end)
+            end
         end
     end)
     UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingSpeed = false end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingSpeed = false
+        end
     end)
 
-    -- Weight (slider)
-    local WeightLabel = Instance.new("TextLabel", Controls)
-    WeightLabel.Size = UDim2.new(1, -10, 0, 15)
+    -- Weight
+    local WeightLabel = Instance.new("TextLabel", ControlsScroll)
+    WeightLabel.Size = UDim2.new(1, -10, 0, 18)
     WeightLabel.Position = UDim2.new(0, 5, 0, 90)
     WeightLabel.BackgroundTransparency = 1
     WeightLabel.Text = "WEIGHT: 100% (Manual)"
     WeightLabel.TextColor3 = Color3.fromRGB(220, 225, 235)
     WeightLabel.Font = Enum.Font.GothamBold
-    WeightLabel.TextSize = 10
-    WeightLabel.Parent = Controls
+    WeightLabel.TextSize = 11
+    WeightLabel.Parent = ControlsScroll
 
-    local WeightBar = Instance.new("Frame", Controls)
-    WeightBar.Size = UDim2.new(1, -20, 0, 4)
-    WeightBar.Position = UDim2.new(0, 10, 0, 110)
+    local WeightBar = Instance.new("Frame", ControlsScroll)
+    WeightBar.Size = UDim2.new(1, -20, 0, 6)
+    WeightBar.Position = UDim2.new(0, 10, 0, 112)
     WeightBar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    WeightBar.Parent = Controls
+    WeightBar.Parent = ControlsScroll
     Instance.new("UICorner", WeightBar).CornerRadius = UDim.new(1, 0)
 
     local WeightBall = Instance.new("TextButton", WeightBar)
-    WeightBall.Size = UDim2.new(0, 16, 0, 16)
-    WeightBall.Position = UDim2.new(1, -8, 0.5, -8)
+    WeightBall.Size = UDim2.new(0, 18, 0, 18)
+    WeightBall.Position = UDim2.new(1, -9, 0.5, -9)
     WeightBall.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     WeightBall.Text = ""
     WeightBall.Parent = WeightBar
     Instance.new("UICorner", WeightBall).CornerRadius = UDim.new(1, 0)
 
+    -- Lógica de arrastar Weight
     local draggingWeight = false
     WeightBall.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -237,204 +262,175 @@ return function(container)
     end)
     UserInputService.InputChanged:Connect(function(input)
         if draggingWeight and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local relativeX = math.clamp(input.Position.X - WeightBar.AbsolutePosition.X, 0, WeightBar.AbsoluteSize.X)
-            local percentage = relativeX / WeightBar.AbsoluteSize.X
-            WeightBall.Position = UDim2.new(percentage, -8, 0.5, -8)
+            local barPos = WeightBar.AbsolutePosition
+            local barSize = WeightBar.AbsoluteSize
+            local relativeX = math.clamp(input.Position.X - barPos.X, 0, barSize.X)
+            local percentage = relativeX / barSize.X
+            WeightBall.Position = UDim2.new(percentage, -9, 0.5, -9)
             State.Weight = percentage
             WeightLabel.Text = "WEIGHT: " .. math.floor(percentage * 100) .. "% (Manual)"
-            if State.CurrentTrack then pcall(function() State.CurrentTrack:AdjustWeight(State.Weight) end) end
+            if State.CurrentTrack then
+                pcall(function() State.CurrentTrack:AdjustWeight(State.Weight) end)
+            end
         end
     end)
     UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingWeight = false end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingWeight = false
+        end
     end)
 
-    -- Botões para definir limites de weight
-    local function CreateSetWeightButton(text, posX, posY, target)
-        local btn = Instance.new("TextButton", Controls)
-        btn.Size = UDim2.new(0.45, 0, 0, 22)
-        btn.Position = UDim2.new(posX, 0, posY, 0)
-        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-        btn.Text = text
-        btn.TextColor3 = Color3.fromRGB(220, 225, 235)
-        btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 9
-        btn.Parent = Controls
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-        btn.MouseButton1Click:Connect(function()
-            if target == "min" then
-                State.MinWeight = State.Weight
-                btn.Text = "MÍN: " .. math.floor(State.MinWeight * 100) .. "%"
-            else
-                State.MaxWeight = State.Weight
-                btn.Text = "MÁX: " .. math.floor(State.MaxWeight * 100) .. "%"
-            end
-        end)
-        return btn
-    end
-
-    CreateSetWeightButton("DEF. MÍN", 0.025, 130, "min")
-    CreateSetWeightButton("DEF. MÁX", 0.525, 130, "max")
+    -- Botões de limite
+    local BtnMin = CreateButton(ControlsScroll, "DEF. MÍNIMO", 140, function()
+        State.MinWeight = State.Weight
+        BtnMin.Text = "MÍN: " .. math.floor(State.MinWeight * 100) .. "%"
+    end)
+    local BtnMax = CreateButton(ControlsScroll, "DEF. MÁXIMO", 175, function()
+        State.MaxWeight = State.Weight
+        BtnMax.Text = "MÁX: " .. math.floor(State.MaxWeight * 100) .. "%"
+    end)
 
     -- Modos de weight
-    local function CreateModeButton(text, posX, posY, mode)
-        local btn = Instance.new("TextButton", Controls)
-        btn.Size = UDim2.new(0.45, 0, 0, 22)
-        btn.Position = UDim2.new(posX, 0, posY, 0)
-        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-        btn.Text = text
-        btn.TextColor3 = Color3.fromRGB(220, 225, 235)
-        btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 9
-        btn.Parent = Controls
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-        btn.MouseButton1Click:Connect(function()
-            State.WeightMode = mode
-            if mode == "Manual" then
+    local function CriarModoWeight(texto, posY, modo)
+        local btn = CreateButton(ControlsScroll, texto, posY, function()
+            State.WeightMode = modo
+            if modo == "Manual" then
                 WeightLabel.Text = "WEIGHT: " .. math.floor(State.Weight * 100) .. "% (Manual)"
             else
-                WeightLabel.Text = "WEIGHT: " .. mode:upper()
+                WeightLabel.Text = "WEIGHT: " .. modo:upper()
             end
         end)
         return btn
     end
 
-    CreateModeButton("SUBIR", 0.025, 156, "Up")
-    CreateModeButton("DESCER", 0.525, 156, "Down")
-    CreateModeButton("LOOP", 0.025, 182, "Loop")
-    CreateModeButton("MANUAL", 0.525, 182, "Manual")
+    CriarModoWeight("SUBIR", 210, "Up")
+    CriarModoWeight("DESCER", 245, "Down")
+    CriarModoWeight("LOOP", 280, "Loop")
+    CriarModoWeight("MANUAL", 315, "Manual")
 
-    -- Velocidade de oscilação
-    local OscSpeedLabel = Instance.new("TextLabel", Controls)
-    OscSpeedLabel.Size = UDim2.new(1, -10, 0, 15)
-    OscSpeedLabel.Position = UDim2.new(0, 5, 0, 210)
-    OscSpeedLabel.BackgroundTransparency = 1
-    OscSpeedLabel.Text = "VEL. OSC: 1.0x"
-    OscSpeedLabel.TextColor3 = Color3.fromRGB(220, 225, 235)
-    OscSpeedLabel.Font = Enum.Font.GothamBold
-    OscSpeedLabel.TextSize = 10
-    OscSpeedLabel.Parent = Controls
+    -- Velocidade da oscilação
+    local OscLabel = Instance.new("TextLabel", ControlsScroll)
+    OscLabel.Size = UDim2.new(1, -10, 0, 18)
+    OscLabel.Position = UDim2.new(0, 5, 0, 350)
+    OscLabel.BackgroundTransparency = 1
+    OscLabel.Text = "VEL. OSC: 1.0x"
+    OscLabel.TextColor3 = Color3.fromRGB(220, 225, 235)
+    OscLabel.Font = Enum.Font.GothamBold
+    OscLabel.TextSize = 11
+    OscLabel.Parent = ControlsScroll
 
-    local OscSpeedBar = Instance.new("Frame", Controls)
-    OscSpeedBar.Size = UDim2.new(1, -20, 0, 4)
-    OscSpeedBar.Position = UDim2.new(0, 10, 0, 230)
-    OscSpeedBar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    OscSpeedBar.Parent = Controls
-    Instance.new("UICorner", OscSpeedBar).CornerRadius = UDim.new(1, 0)
+    local OscBar = Instance.new("Frame", ControlsScroll)
+    OscBar.Size = UDim2.new(1, -20, 0, 6)
+    OscBar.Position = UDim2.new(0, 10, 0, 372)
+    OscBar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    OscBar.Parent = ControlsScroll
+    Instance.new("UICorner", OscBar).CornerRadius = UDim.new(1, 0)
 
-    local OscSpeedBall = Instance.new("TextButton", OscSpeedBar)
-    OscSpeedBall.Size = UDim2.new(0, 16, 0, 16)
-    OscSpeedBall.Position = UDim2.new(0.5, -8, 0.5, -8)
-    OscSpeedBall.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-    OscSpeedBall.Text = ""
-    OscSpeedBall.Parent = OscSpeedBar
-    Instance.new("UICorner", OscSpeedBall).CornerRadius = UDim.new(1, 0)
+    local OscBall = Instance.new("TextButton", OscBar)
+    OscBall.Size = UDim2.new(0, 18, 0, 18)
+    OscBall.Position = UDim2.new(0.5, -9, 0.5, -9)
+    OscBall.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+    OscBall.Text = ""
+    OscBall.Parent = OscBar
+    Instance.new("UICorner", OscBall).CornerRadius = UDim.new(1, 0)
 
-    local draggingOscSpeed = false
-    OscSpeedBall.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingOscSpeed = true end
+    local draggingOsc = false
+    OscBall.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingOsc = true
+        end
     end)
     UserInputService.InputChanged:Connect(function(input)
-        if draggingOscSpeed and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local relativeX = math.clamp(input.Position.X - OscSpeedBar.AbsolutePosition.X, 0, OscSpeedBar.AbsoluteSize.X)
-            local percentage = relativeX / OscSpeedBar.AbsoluteSize.X
-            OscSpeedBall.Position = UDim2.new(percentage, -8, 0.5, -8)
+        if draggingOsc and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local barPos = OscBar.AbsolutePosition
+            local barSize = OscBar.AbsoluteSize
+            local relativeX = math.clamp(input.Position.X - barPos.X, 0, barSize.X)
+            local percentage = relativeX / barSize.X
+            OscBall.Position = UDim2.new(percentage, -9, 0.5, -9)
             State.WeightOscSpeed = percentage * 5
-            OscSpeedLabel.Text = string.format("VEL. OSC: %.1fx", State.WeightOscSpeed)
+            OscLabel.Text = string.format("VEL. OSC: %.1fx", State.WeightOscSpeed)
         end
     end)
     UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingOscSpeed = false end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingOsc = false
+        end
     end)
 
-    -- Controles de tempo da animação
-    local TimeStartLabel = Instance.new("TextLabel", Controls)
-    TimeStartLabel.Size = UDim2.new(0.45, 0, 0, 15)
-    TimeStartLabel.Position = UDim2.new(0.025, 0, 0, 255)
-    TimeStartLabel.BackgroundTransparency = 1
-    TimeStartLabel.Text = "INÍCIO (s): 0"
-    TimeStartLabel.TextColor3 = Color3.fromRGB(220, 225, 235)
-    TimeStartLabel.Font = Enum.Font.GothamBold
-    TimeStartLabel.TextSize = 9
-    TimeStartLabel.Parent = Controls
+    -- Controles de tempo
+    local StartLabel = Instance.new("TextLabel", ControlsScroll)
+    StartLabel.Size = UDim2.new(1, -10, 0, 15)
+    StartLabel.Position = UDim2.new(0, 5, 0, 395)
+    StartLabel.BackgroundTransparency = 1
+    StartLabel.Text = "INÍCIO (s): 0"
+    StartLabel.TextColor3 = Color3.fromRGB(220, 225, 235)
+    StartLabel.Font = Enum.Font.GothamBold
+    StartLabel.TextSize = 10
+    StartLabel.Parent = ControlsScroll
 
-    local TimeEndLabel = Instance.new("TextLabel", Controls)
-    TimeEndLabel.Size = UDim2.new(0.45, 0, 0, 15)
-    TimeEndLabel.Position = UDim2.new(0.525, 0, 0, 255)
-    TimeEndLabel.BackgroundTransparency = 1
-    TimeEndLabel.Text = "FIM (s): 10"
-    TimeEndLabel.TextColor3 = Color3.fromRGB(220, 225, 235)
-    TimeEndLabel.Font = Enum.Font.GothamBold
-    TimeEndLabel.TextSize = 9
-    TimeEndLabel.Parent = Controls
+    local StartBox = Instance.new("TextBox", ControlsScroll)
+    StartBox.Size = UDim2.new(1, -10, 0, 25)
+    StartBox.Position = UDim2.new(0, 5, 0, 410)
+    StartBox.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    StartBox.Text = "0"
+    StartBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    StartBox.Font = Enum.Font.Gotham
+    StartBox.TextSize = 10
+    StartBox.Parent = ControlsScroll
+    Instance.new("UICorner", StartBox).CornerRadius = UDim.new(0, 5)
 
-    local TimeStartBox = Instance.new("TextBox", Controls)
-    TimeStartBox.Size = UDim2.new(0.45, 0, 0, 20)
-    TimeStartBox.Position = UDim2.new(0.025, 0, 0, 270)
-    TimeStartBox.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-    TimeStartBox.Text = "0"
-    TimeStartBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-    TimeStartBox.Font = Enum.Font.Gotham
-    TimeStartBox.TextSize = 10
-    TimeStartBox.Parent = Controls
-    Instance.new("UICorner", TimeStartBox).CornerRadius = UDim.new(0, 4)
+    local EndLabel = Instance.new("TextLabel", ControlsScroll)
+    EndLabel.Size = UDim2.new(1, -10, 0, 15)
+    EndLabel.Position = UDim2.new(0, 5, 0, 445)
+    EndLabel.BackgroundTransparency = 1
+    EndLabel.Text = "FIM (s): 10"
+    EndLabel.TextColor3 = Color3.fromRGB(220, 225, 235)
+    EndLabel.Font = Enum.Font.GothamBold
+    EndLabel.TextSize = 10
+    EndLabel.Parent = ControlsScroll
 
-    local TimeEndBox = Instance.new("TextBox", Controls)
-    TimeEndBox.Size = UDim2.new(0.45, 0, 0, 20)
-    TimeEndBox.Position = UDim2.new(0.525, 0, 0, 270)
-    TimeEndBox.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-    TimeEndBox.Text = "10"
-    TimeEndBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-    TimeEndBox.Font = Enum.Font.Gotham
-    TimeEndBox.TextSize = 10
-    TimeEndBox.Parent = Controls
-    Instance.new("UICorner", TimeEndBox).CornerRadius = UDim.new(0, 4)
+    local EndBox = Instance.new("TextBox", ControlsScroll)
+    EndBox.Size = UDim2.new(1, -10, 0, 25)
+    EndBox.Position = UDim2.new(0, 5, 0, 460)
+    EndBox.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    EndBox.Text = "10"
+    EndBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    EndBox.Font = Enum.Font.Gotham
+    EndBox.TextSize = 10
+    EndBox.Parent = ControlsScroll
+    Instance.new("UICorner", EndBox).CornerRadius = UDim.new(0, 5)
 
-    TimeStartBox.FocusLost:Connect(function()
-        State.TimeStart = tonumber(TimeStartBox.Text) or 0
-        TimeStartLabel.Text = "INÍCIO (s): " .. State.TimeStart
+    StartBox.FocusLost:Connect(function()
+        State.TimeStart = tonumber(StartBox.Text) or 0
+        StartLabel.Text = "INÍCIO (s): " .. State.TimeStart
     end)
-    TimeEndBox.FocusLost:Connect(function()
-        State.TimeEnd = tonumber(TimeEndBox.Text) or 10
-        TimeEndLabel.Text = "FIM (s): " .. State.TimeEnd
+    EndBox.FocusLost:Connect(function()
+        State.TimeEnd = tonumber(EndBox.Text) or 10
+        EndLabel.Text = "FIM (s): " .. State.TimeEnd
     end)
 
-    -- Modo de reprodução
-    local function CreatePlayModeButton(text, posY, mode)
-        local btn = Instance.new("TextButton", Controls)
-        btn.Size = UDim2.new(1, -10, 0, 22)
-        btn.Position = UDim2.new(0, 5, 0, posY)
-        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-        btn.Text = text
-        btn.TextColor3 = Color3.fromRGB(220, 225, 235)
-        btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 9
-        btn.Parent = Controls
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-        btn.MouseButton1Click:Connect(function()
-            State.PlayMode = mode
+    -- Modos de reprodução
+    local function CriarPlayMode(texto, posY, modo)
+        local btn = CreateButton(ControlsScroll, texto, posY, function()
+            State.PlayMode = modo
+            if State.CurrentTrack then
+                if modo == "Reverse" then
+                    pcall(function() State.CurrentTrack:AdjustSpeed(-math.abs(State.Speed)) end)
+                else
+                    pcall(function() State.CurrentTrack:AdjustSpeed(State.Freeze and 0 or State.Speed) end)
+                end
+            end
         end)
         return btn
     end
 
-    CreatePlayModeButton("▶ NORMAL", 295, "Normal")
-    CreatePlayModeButton("◀ REVERSO", 320, "Reverse")
-    CreatePlayModeButton("⏸ PAUSAR NO FIM", 345, "PauseEnd")
-    CreatePlayModeButton("🔄 VOLTAR INÍCIO", 370, "ResetEnd")
+    CriarPlayMode("▶ NORMAL", 500, "Normal")
+    CriarPlayMode("◀ REVERSO", 535, "Reverse")
+    CriarPlayMode("⏸ PAUSAR NO FIM", 570, "PauseEnd")
+    CriarPlayMode("🔄 VOLTAR INÍCIO", 605, "ResetEnd")
 
-    -- Freeze Frame
-    local FreezeBtn = Instance.new("TextButton", Controls)
-    FreezeBtn.Size = UDim2.new(1, -10, 0, 25)
-    FreezeBtn.Position = UDim2.new(0, 5, 0, 395)
-    FreezeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-    FreezeBtn.Text = "❄️ FREEZE: OFF"
-    FreezeBtn.TextColor3 = Color3.fromRGB(220, 225, 235)
-    FreezeBtn.Font = Enum.Font.GothamBold
-    FreezeBtn.TextSize = 9
-    FreezeBtn.Parent = Controls
-    Instance.new("UICorner", FreezeBtn).CornerRadius = UDim.new(0, 4)
-
-    FreezeBtn.MouseButton1Click:Connect(function()
+    -- Freeze
+    local FreezeBtn = CreateButton(ControlsScroll, "❄️ FREEZE: OFF", 640, function()
         State.Freeze = not State.Freeze
         FreezeBtn.BackgroundColor3 = State.Freeze and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(40, 40, 60)
         FreezeBtn.Text = State.Freeze and "❄️ FREEZE: ON" or "❄️ FREEZE: OFF"
@@ -442,33 +438,35 @@ return function(container)
             pcall(function() State.CurrentTrack:AdjustSpeed(State.Freeze and 0 or State.Speed) end)
         end
     end)
+    FreezeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+
+    -- Ajustar canvas do ControlsScroll
+    ControlsScroll.CanvasSize = UDim2.new(0, 0, 0, 675)
 
     -- ==========================================
     -- 🔍 BUSCA E PAGINAÇÃO DE EMOTES
     -- ==========================================
     local SearchEmote = Instance.new("TextBox", container)
-    SearchEmote.Size = UDim2.new(1, -180, 0, 30)
-    SearchEmote.Position = UDim2.new(0, 175, 0, -35)
+    SearchEmote.Size = UDim2.new(1, -210, 0, 30)
+    SearchEmote.Position = UDim2.new(0, 205, 0, -35)
     SearchEmote.BackgroundColor3 = Color3.fromRGB(22, 28, 38)
     SearchEmote.PlaceholderText = "🔍 Pesquisar emote ou colar link/ID..."
     SearchEmote.TextColor3 = Color3.fromRGB(255, 255, 255)
     SearchEmote.Font = Enum.Font.Gotham
-    SearchEmote.TextSize = 10
+    SearchEmote.TextSize = 11
     SearchEmote.Parent = container
-    Instance.new("UICorner", SearchEmote).CornerRadius = UDim.new(0, 4)
+    Instance.new("UICorner", SearchEmote).CornerRadius = UDim.new(0, 5)
 
-    -- Grid de emotes
+    -- Área de grid (lista vertical de 5 itens)
     local EmoteGrid = Instance.new("ScrollingFrame", container)
-    EmoteGrid.Size = UDim2.new(1, -180, 1, -10)
-    EmoteGrid.Position = UDim2.new(0, 175, 0, 5)
+    EmoteGrid.Size = UDim2.new(1, -210, 1, -10)
+    EmoteGrid.Position = UDim2.new(0, 205, 0, 5)
     EmoteGrid.BackgroundTransparency = 1
     EmoteGrid.ScrollBarThickness = 3
     EmoteGrid.Parent = container
 
-    local Grid = Instance.new("UIGridLayout", EmoteGrid)
-    Grid.CellSize = UDim2.new(0, 155, 0, 160)
-    Grid.CellPadding = UDim2.new(0, 8, 0, 8)
-    Grid.HorizontalAlignment = Enum.HorizontalAlignment.Left
+    local GridLayout = Instance.new("UIListLayout", EmoteGrid)
+    GridLayout.Padding = UDim.new(0, 6)
 
     -- Paginação
     local ITENS_POR_PAGINA = 5
@@ -476,7 +474,7 @@ return function(container)
     local emoteListaFiltrada = {}
 
     local function AtualizarPagina()
-        -- limpa o grid
+        -- Limpa a lista
         for _, child in ipairs(EmoteGrid:GetChildren()) do
             if child:IsA("Frame") then child:Destroy() end
         end
@@ -484,59 +482,60 @@ return function(container)
         local inicio = (paginaAtual - 1) * ITENS_POR_PAGINA + 1
         local fim = math.min(inicio + ITENS_POR_PAGINA - 1, #emoteListaFiltrada)
 
-        local itens = 0
         for i = inicio, fim do
             local emote = emoteListaFiltrada[i]
             if emote then
-                itens = itens + 1
-                local Card = Instance.new("Frame", EmoteGrid)
-                Card.Size = UDim2.new(1, 0, 1, 0)
-                Card.BackgroundColor3 = Color3.fromRGB(22, 28, 38)
-                Card.Parent = EmoteGrid
-                Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 8)
+                local Item = Instance.new("Frame", EmoteGrid)
+                Item.Size = UDim2.new(1, -4, 0, 70)
+                Item.BackgroundColor3 = Color3.fromRGB(22, 28, 38)
+                Item.Parent = EmoteGrid
+                Instance.new("UICorner", Item).CornerRadius = UDim.new(0, 6)
 
-                local Thumb = Instance.new("ImageLabel", Card)
-                Thumb.Size = UDim2.new(1, -10, 0, 90)
+                -- Thumbnail
+                local Thumb = Instance.new("ImageLabel", Item)
+                Thumb.Size = UDim2.new(0, 60, 0, 60)
                 Thumb.Position = UDim2.new(0, 5, 0, 5)
                 Thumb.BackgroundColor3 = Color3.fromRGB(30, 35, 45)
-                Thumb.Image = "rbxthumb://type=Asset&id=" .. emote.Id .. "&w=140&h=140"
-                Thumb.Parent = Card
-                Instance.new("UICorner", Thumb).CornerRadius = UDim.new(0, 6)
+                Thumb.Image = "rbxthumb://type=Asset&id=" .. emote.Id .. "&w=100&h=100"
+                Thumb.Parent = Item
+                Instance.new("UICorner", Thumb).CornerRadius = UDim.new(0, 4)
 
-                local Label = Instance.new("TextLabel", Card)
-                Label.Size = UDim2.new(1, -10, 0, 20)
-                Label.Position = UDim2.new(0, 5, 0, 100)
+                -- Nome
+                local Label = Instance.new("TextLabel", Item)
+                Label.Size = UDim2.new(1, -70, 0, 20)
+                Label.Position = UDim2.new(0, 70, 0, 10)
                 Label.BackgroundTransparency = 1
                 Label.Text = emote.Name
                 Label.TextColor3 = Color3.fromRGB(220, 225, 235)
                 Label.Font = Enum.Font.GothamBold
-                Label.TextSize = 9
-                Label.TextTruncate = Enum.TextTruncate.AtEnd
-                Label.Parent = Card
+                Label.TextSize = 11
+                Label.TextXAlignment = Enum.TextXAlignment.Left
+                Label.Parent = Item
 
-                local PlayBtn = Instance.new("TextButton", Card)
-                PlayBtn.Size = UDim2.new(1, -10, 0, 20)
-                PlayBtn.Position = UDim2.new(0, 5, 0, 120)
+                -- Botão Ativar
+                local PlayBtn = Instance.new("TextButton", Item)
+                PlayBtn.Size = UDim2.new(0, 60, 0, 25)
+                PlayBtn.Position = UDim2.new(0, 70, 0, 35)
                 PlayBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
-                PlayBtn.Text = "▶ ATIVAR"
-                PlayBtn.TextColor3 = Color3.fromRGB(255,255,255)
+                PlayBtn.Text = "ATIVAR"
+                PlayBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
                 PlayBtn.Font = Enum.Font.GothamBold
                 PlayBtn.TextSize = 9
-                PlayBtn.Parent = Card
+                PlayBtn.Parent = Item
                 Instance.new("UICorner", PlayBtn).CornerRadius = UDim.new(0, 4)
                 PlayBtn.MouseButton1Click:Connect(function() PlayEmote(emote.Id) end)
 
-                -- Botão favoritar
-                local StarBtn = Instance.new("TextButton", Card)
-                StarBtn.Size = UDim2.new(0, 20, 0, 20)
-                StarBtn.Position = UDim2.new(1, -25, 0, 5)
+                -- Botão Favoritar
+                local StarBtn = Instance.new("TextButton", Item)
+                StarBtn.Size = UDim2.new(0, 30, 0, 25)
+                StarBtn.Position = UDim2.new(0, 140, 0, 35)
                 StarBtn.BackgroundColor3 = Color3.fromRGB(40, 45, 55)
                 StarBtn.Text = "⭐"
                 StarBtn.TextSize = 10
-                StarBtn.Parent = Card
+                StarBtn.Parent = Item
                 Instance.new("UICorner", StarBtn).CornerRadius = UDim.new(0, 4)
                 StarBtn.MouseButton1Click:Connect(function()
-                    -- Criar popup de nome
+                    -- Popup para salvar favorito com nome
                     local Popup = Instance.new("Frame", container)
                     Popup.Size = UDim2.new(0, 300, 0, 80)
                     Popup.Position = UDim2.new(0.5, -150, 0.5, -40)
@@ -584,7 +583,7 @@ return function(container)
                         local file = "emote_favoritos.txt"
                         local sucesso, conteudo = pcall(readfile, file)
                         if not sucesso then conteudo = "" end
-                        if not string.find(conteudo, emote.Id) then
+                        if not string.find(conteudo, tostring(emote.Id)) then
                             pcall(writefile, file, conteudo .. nome .. ";" .. emote.Id .. "\n")
                         end
                         Popup:Destroy()
@@ -595,14 +594,13 @@ return function(container)
         end
 
         -- Atualizar canvas
-        local rows = math.ceil(itens / 1) -- uma coluna (5 itens empilhados)
-        EmoteGrid.CanvasSize = UDim2.new(0, 0, 0, rows * (160 + 8) + 10)
+        EmoteGrid.CanvasSize = UDim2.new(0, 0, 0, math.max(1, #emoteListaFiltrada) * 76 + 10)
     end
 
-    -- Botões de página (fora do grid, mas na mesma área)
+    -- Controles de página
     local PageInfo = Instance.new("TextLabel", container)
     PageInfo.Size = UDim2.new(0, 100, 0, 20)
-    PageInfo.Position = UDim2.new(0, 175, 0, -35)
+    PageInfo.Position = UDim2.new(0, 205, 0, -35)
     PageInfo.BackgroundTransparency = 1
     PageInfo.Text = "1/1"
     PageInfo.TextColor3 = Color3.fromRGB(220, 225, 235)
@@ -612,7 +610,7 @@ return function(container)
 
     local PrevBtn = Instance.new("TextButton", container)
     PrevBtn.Size = UDim2.new(0, 40, 0, 25)
-    PrevBtn.Position = UDim2.new(0, 175, 1, -30)
+    PrevBtn.Position = UDim2.new(0, 205, 1, -30)
     PrevBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
     PrevBtn.Text = "◀"
     PrevBtn.TextColor3 = Color3.fromRGB(255,255,255)
@@ -648,7 +646,7 @@ return function(container)
         end
     end)
 
-    -- Função de busca e filtro
+    -- Função de filtro
     local function BuscarEmotes(texto)
         emoteListaFiltrada = {}
         if string.find(texto, "roblox.com") then
@@ -687,7 +685,7 @@ return function(container)
                 State.WeightPhase = State.WeightPhase + delta * speed
                 State.Weight = State.MinWeight + ((State.MaxWeight - State.MinWeight) * (math.sin(State.WeightPhase) + 1) / 2)
             end
-            WeightBall.Position = UDim2.new(State.Weight, -8, 0.5, -8)
+            WeightBall.Position = UDim2.new(State.Weight, -9, 0.5, -9)
             pcall(function() State.CurrentTrack:AdjustWeight(State.Weight) end)
         end
     end)
