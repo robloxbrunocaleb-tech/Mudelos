@@ -1,48 +1,35 @@
 -- ==========================================
--- 👑 IMPERIAL AUDIO HUB | BOT & MASTER EDITION
+-- 👑 IMPERIAL AUDIO HUB | MÚSICAS (STANDALONE)
 -- ==========================================
 
-local CoreGui = game:GetService("CoreGui")
-local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local Player = Players.LocalPlayer
-local RunService = game:GetService("RunService")
-local Lighting = game:GetService("Lighting")
-local Workspace = game:GetService("Workspace")
-local LogService = game:GetService("LogService")
 
--- ==========================================
--- 🔒 OFUSCAÇÃO XOR (chave secreta)
--- ==========================================
-local CHAVE_XOR = 0x5A
-
-local function decodificarId(codificado)
-    local bytes = {}
-    for hex in codificado:gmatch("%x%x") do
-        table.insert(bytes, string.char(tonumber(hex, 16)))
+-- Obtém o contêiner sem CoreGui
+local function getGuiParent()
+    if gethui then
+        return gethui()
+    elseif syn and syn.protect_gui then
+        return syn.protect_gui(Instance.new("ScreenGui"))
+    else
+        return Player:WaitForChild("PlayerGui")
     end
-    local id = ""
-    for i, b in ipairs(bytes) do
-        local byte = string.byte(b)
-        local dec = bit32.bxor(byte, CHAVE_XOR)
-        id = id .. string.char(dec)
-    end
-    return id
 end
 
-local function ObterIdReal(id)
-    if type(id) == "string" and id:match("^%x+$") and id:match("[A-Fa-f]") and #id % 2 == 0 then
-        local ok, decod = pcall(decodificarId, id)
-        if ok then return decod end
-    end
-    return id
+local guiParent = getGuiParent()
+
+-- Remove interface antiga
+if guiParent:FindFirstChild("ImperialMusic") then
+    guiParent.ImperialMusic:Destroy()
 end
 
 -- ==========================================
--- 🎵 LISTA DE MÚSICAS (IDs REAIS)
+-- 🎵 LISTA DE MÚSICAS (COLE SUA LISTA AQUI)
 -- ==========================================
-local RawAudios = {
+local Audios = {
     {"Áudio Extra 1", "76478166396249"},
     {"Áudio Extra 2", "108593274701669"},
     {"Áudio Extra 3", "137469629660199"},
@@ -381,68 +368,26 @@ local RawAudios = {
 }
 
 -- Remove duplicatas
-local Audios = {}
 local Vistos = {}
-for _, item in ipairs(RawAudios) do
-    local nome = item[1]
-    local id = tostring(item[2]):gsub("%s+", "")
+local AudiosFiltrados = {}
+for _, item in ipairs(Audios) do
+    local nome, id = item[1], tostring(item[2]):gsub("%s+", "")
     if not Vistos[id] then
         Vistos[id] = true
-        table.insert(Audios, {nome, id})
+        table.insert(AudiosFiltrados, {nome, id})
     end
 end
+Audios = AudiosFiltrados
 
 -- ==========================================
--- 🕺 LISTA DE EMOTES (IDs do Roblox)
--- ==========================================
-local Emotes = {
-    {"Aceno", "3344652691"},
-    {"Apontar", "3344652888"},
-    {"Aplaudir", "3344653250"},
-    {"Rir", "3344653638"},
-    {"Dançar", "3344653957"},
-    {"Dançar 2", "3344654156"},
-    {"Dançar 3", "3344654392"},
-    {"Dançar 4", "3344654652"},
-    {"Saudação", "3344654790"},
-    {"Sentar", "3344654952"},
-    {"Dormir", "3344655144"},
-    {"Conversar", "3344655331"},
-    {"Ocioso", "3344655502"},
-    {"Andar", "3344655653"},
-    {"Correr", "3344655813"},
-    {"Pular", "3344655960"},
-    {"Cair", "3344656106"},
-    {"Escalar", "3344656248"},
-    {"Nadar", "3344656384"},
-    {"Morrer", "3344656527"},
-}
-
--- ==========================================
--- ⚙️ VARIÁVEIS GLOBAIS
--- ==========================================
-local LoopMusicaAtivo = false
-local MusicaAtualID = nil
-local AntiLagAtivo = true
-local AndarComEmote = false
-local BoomboxAntiRemoverAtivo = false
-
--- ==========================================
--- ⚙️ MOTOR DE DISPARO GLOBAL (OFUSCADO NIVEL GOD)
+-- 🔒 OFUSCAÇÃO DO MOTOR DE DISPARO
 -- ==========================================
 local RE = ReplicatedStorage:WaitForChild("RE")
-
 local function C(...) return string.char(...) end
 
 local function TocarGlobal(id)
     if id == "" or id == nil then return end
-    local idReal = ObterIdReal(tostring(id))
-    if idReal == C(48) then
-        MusicaAtualID = nil
-    else
-        MusicaAtualID = idReal
-    end
-
+    local idReal = tostring(id)
     local function fire(remoteName, eventName, ...)
         pcall(function()
             local remote = RE:FindFirstChild(remoteName)
@@ -451,7 +396,6 @@ local function TocarGlobal(id)
             end
         end)
     end
-
     fire(C(80,108,97,121,101,114,84,111,111,108,69,118,101,110,116), C(84,111,111,108,77,117,115,105,99,84,101,120,116), idReal, nil, true)
     fire(C(49,80,108,97,121,101,114,49,115,72,111,117,115,49,101), C(80,105,99,107,72,111,117,115,101,77,117,115,105,99,84,101,120,116), idReal, nil, true)
     fire(C(49,80,108,97,121,101,114,49,115,67,97,49,114), C(77,117,115,105,99), idReal, nil, true)
@@ -460,332 +404,140 @@ local function TocarGlobal(id)
     fire(C(80,114,111,112,115), C(80,114,111,112,77,117,115,105,99,84,101,120,116), idReal, nil, true)
 end
 
--- Loop de música (replay)
-task.spawn(function()
-    while true do
-        task.wait(5)
-        if LoopMusicaAtivo and MusicaAtualID then
-            task.wait(180)
-            TocarGlobal(MusicaAtualID)
-        end
-    end
-end)
-
 -- ==========================================
--- 🗣️ SISTEMA DE CHAT & MESTRE
--- ==========================================
-local MASTER_NAME = "mudinho0975"
-
-local function FalarNoChat(mensagem)
-    pcall(function()
-        ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(mensagem, "All")
-    end)
-    pcall(function()
-        local textChannel = game:GetService("TextChatService").TextChannels.RBXGeneral
-        textChannel:SendAsync(mensagem)
-    end)
-end
-
-local function ProcessarComando(msg)
-    local comando = string.lower(msg)
-    if comando == "/desligar musica" then
-        FalarNoChat("selecionando musica")
-        task.wait(1.5)
-        TocarGlobal("0")
-        FalarNoChat("Adicionado")
-    elseif comando == "/ligar" then
-        local currentID = guiParent.ImperialAudioHub.MainFrame.TabManual.InputManual.Text
-        if currentID == "" then
-            currentID = Audios[1][2]
-            guiParent.ImperialAudioHub.MainFrame.TabManual.InputManual.Text = currentID
-        end
-        FalarNoChat("selecionando musica")
-        task.wait(1.5)
-        TocarGlobal(currentID)
-        FalarNoChat("Adicionado")
-    elseif comando == "/ligar favoritos" then
-        FalarNoChat("selecionando musica")
-        task.wait(1.5)
-        local musicaAleatoria = Audios[math.random(1, #Audios)][2]
-        guiParent.ImperialAudioHub.MainFrame.TabManual.InputManual.Text = musicaAleatoria
-        TocarGlobal(musicaAleatoria)
-        FalarNoChat("Adicionado")
-    end
-end
-
-local function EscutarJogador(p)
-    if p.Name:lower() == MASTER_NAME:lower() or p == Player then
-        p.Chatted:Connect(function(msg)
-            ProcessarComando(msg)
-        end)
-    end
-end
-
-for _, p in ipairs(Players:GetPlayers()) do
-    EscutarJogador(p)
-end
-Players.PlayerAdded:Connect(EscutarJogador)
-
--- ==========================================
--- 🧹 ANTI-LAG: REMOVER EFEITOS VISUAIS
--- ==========================================
-local function LimparEfeitos()
-    Lighting.GlobalShadows = false
-    Lighting.FogEnd = 100
-    Lighting.Brightness = 2
-    Lighting.OutdoorAmbient = Color3.new(0.5, 0.5, 0.5)
-
-    local function RemoverEfeitosDe(obj)
-        for _, filho in ipairs(obj:GetChildren()) do
-            if filho:IsA("ParticleEmitter") or filho:IsA("Trail") or filho:IsA("Beam") or
-               filho:IsA("Fire") or filho:IsA("Smoke") or filho:IsA("Sparkles") or
-               filho:IsA("PointLight") or filho:IsA("SpotLight") or filho:IsA("SurfaceLight") then
-                filho:Destroy()
-            end
-            RemoverEfeitosDe(filho)
-        end
-    end
-
-    RemoverEfeitosDe(Workspace)
-end
-
-Workspace.DescendantAdded:Connect(function(desc)
-    if AntiLagAtivo then
-        if desc:IsA("ParticleEmitter") or desc:IsA("Trail") or desc:IsA("Beam") or
-           desc:IsA("Fire") or desc:IsA("Smoke") or desc:IsA("Sparkles") or
-           desc:IsA("PointLight") or desc:IsA("SpotLight") or desc:IsA("SurfaceLight") then
-            task.wait(0.1)
-            desc:Destroy()
-        end
-    end
-end)
-
-task.spawn(function()
-    while true do
-        task.wait(30)
-        pcall(function() LogService:ClearOutput() end)
-        pcall(function() collectgarbage("collect") end)
-    end
-end)
-
--- ==========================================
--- 🎨 INTERFACE MODERNA
+-- 🎨 INTERFACE
 -- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ImperialAudioHub"
+ScreenGui.Name = "ImperialMusic"
 ScreenGui.ResetOnSpawn = false
-local guiParent = CoreGui:FindFirstChild("RobloxGui") or Player:WaitForChild("PlayerGui")
 ScreenGui.Parent = guiParent
 
--- Cores
-local CorFundo = Color3.fromRGB(13, 17, 23)
-local CorCartao = Color3.fromRGB(22, 27, 34)
-local CorBorda = Color3.fromRGB(48, 54, 61)
-local CorDestaque = Color3.fromRGB(88, 166, 255)
-local CorTexto = Color3.fromRGB(201, 209, 217)
-local CorVerde = Color3.fromRGB(63, 185, 80)
-local CorVermelho = Color3.fromRGB(248, 81, 73)
-
--- Botão flutuante
-local ToggleBtn = Instance.new("TextButton", ScreenGui)
-ToggleBtn.Size = UDim2.new(0, 40, 0, 40)
-ToggleBtn.Position = UDim2.new(1, -50, 0, 10)
-ToggleBtn.BackgroundColor3 = CorCartao
-ToggleBtn.Text = "👑"
-ToggleBtn.TextSize = 22
-ToggleBtn.AutoButtonColor = false
-Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 8)
-local ToggleStroke = Instance.new("UIStroke", ToggleBtn)
-ToggleStroke.Color = CorDestaque
-ToggleStroke.Thickness = 1
-
--- Janela principal
-local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 480, 0, 560)
-MainFrame.Position = UDim2.new(0.5, -240, 0.5, -280)
-MainFrame.BackgroundColor3 = CorFundo
-MainFrame.Visible = false
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 400, 0, 500)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
+MainFrame.BackgroundColor3 = Color3.fromRGB(13, 17, 23)
 MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
-local MainStroke = Instance.new("UIStroke", MainFrame)
-MainStroke.Color = CorBorda
-MainStroke.Thickness = 1.5
+Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(88, 166, 255)
 
--- Barra superior
-local TopBar = Instance.new("Frame", MainFrame)
-TopBar.Size = UDim2.new(1, 0, 0, 45)
-TopBar.BackgroundTransparency = 1
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 40)
+TopBar.BackgroundColor3 = Color3.fromRGB(10, 14, 20)
+TopBar.Parent = MainFrame
+Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 12)
 
-local Title = Instance.new("TextLabel", TopBar)
-Title.Size = UDim2.new(1, -50, 1, 0)
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -40, 1, 0)
 Title.Position = UDim2.new(0, 20, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "👑 IMPERIAL AUDIO HUB"
-Title.TextColor3 = CorDestaque
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
-Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Text = "🎵 MÚSICAS"
+Title.TextColor3 = Color3.fromRGB(88, 166, 255)
+Title.Font = Enum.Font.GothamBlack
+Title.TextSize = 18
+Title.Parent = TopBar
 
-local CloseBtn = Instance.new("TextButton", TopBar)
+local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 40, 0, 40)
 CloseBtn.Position = UDim2.new(1, -40, 0, 0)
 CloseBtn.BackgroundTransparency = 1
 CloseBtn.Text = "✖"
-CloseBtn.TextColor3 = CorVermelho
+CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 18
+CloseBtn.Parent = TopBar
 
--- Abas
-local TabContainer = Instance.new("Frame", MainFrame)
-TabContainer.Size = UDim2.new(1, -20, 0, 35)
-TabContainer.Position = UDim2.new(0, 10, 0, 50)
-TabContainer.BackgroundTransparency = 1
+local SearchBox = Instance.new("TextBox")
+SearchBox.Size = UDim2.new(1, -20, 0, 35)
+SearchBox.Position = UDim2.new(0, 10, 0, 50)
+SearchBox.BackgroundColor3 = Color3.fromRGB(22, 27, 34)
+SearchBox.TextColor3 = Color3.fromRGB(201, 209, 217)
+SearchBox.PlaceholderText = "🔍 Pesquisar música..."
+SearchBox.Font = Enum.Font.GothamSemibold
+SearchBox.TextSize = 14
+SearchBox.Parent = MainFrame
+Instance.new("UICorner", SearchBox).CornerRadius = UDim.new(0, 6)
 
-local BtnMusica = Instance.new("TextButton", TabContainer)
-BtnMusica.Size = UDim2.new(0.33, -2, 1, 0)
-BtnMusica.Position = UDim2.new(0, 0, 0, 0)
-BtnMusica.BackgroundColor3 = CorCartao
-BtnMusica.Text = "🎵 Músicas"
-BtnMusica.TextColor3 = CorTexto
-BtnMusica.Font = Enum.Font.GothamBold
-BtnMusica.TextSize = 12
-Instance.new("UICorner", BtnMusica).CornerRadius = UDim.new(0, 6)
+local ResultCount = Instance.new("TextLabel")
+ResultCount.Size = UDim2.new(1, -20, 0, 15)
+ResultCount.Position = UDim2.new(0, 10, 0, 90)
+ResultCount.BackgroundTransparency = 1
+ResultCount.Text = "0 músicas"
+ResultCount.TextColor3 = Color3.fromRGB(201, 209, 217)
+ResultCount.Font = Enum.Font.GothamSemibold
+ResultCount.TextSize = 10
+ResultCount.TextXAlignment = Enum.TextXAlignment.Left
+ResultCount.Parent = MainFrame
 
-local BtnEmote = Instance.new("TextButton", TabContainer)
-BtnEmote.Size = UDim2.new(0.33, -2, 1, 0)
-BtnEmote.Position = UDim2.new(0.33, 2, 0, 0)
-BtnEmote.BackgroundColor3 = CorCartao
-BtnEmote.Text = "🕺 Emotes"
-BtnEmote.TextColor3 = CorTexto
-BtnEmote.Font = Enum.Font.GothamBold
-BtnEmote.TextSize = 12
-Instance.new("UICorner", BtnEmote).CornerRadius = UDim.new(0, 6)
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Size = UDim2.new(1, -20, 1, -120)
+ScrollFrame.Position = UDim2.new(0, 10, 0, 110)
+ScrollFrame.BackgroundTransparency = 1
+ScrollFrame.ScrollBarThickness = 4
+ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(88, 166, 255)
+ScrollFrame.Parent = MainFrame
 
-local BtnExtras = Instance.new("TextButton", TabContainer)
-BtnExtras.Size = UDim2.new(0.34, -2, 1, 0)
-BtnExtras.Position = UDim2.new(0.66, 2, 0, 0)
-BtnExtras.BackgroundColor3 = CorCartao
-BtnExtras.Text = "⚙️ Extras"
-BtnExtras.TextColor3 = CorTexto
-BtnExtras.Font = Enum.Font.GothamBold
-BtnExtras.TextSize = 12
-Instance.new("UICorner", BtnExtras).CornerRadius = UDim.new(0, 6)
+local ListLayout = Instance.new("UIListLayout", ScrollFrame)
+ListLayout.Padding = UDim.new(0, 8)
 
--- Container das abas
-local TabMusica = Instance.new("Frame", MainFrame)
-TabMusica.Size = UDim2.new(1, -20, 1, -100)
-TabMusica.Position = UDim2.new(0, 10, 0, 95)
-TabMusica.BackgroundTransparency = 1
-TabMusica.Visible = true
-
-local TabEmote = Instance.new("Frame", MainFrame)
-TabEmote.Size = UDim2.new(1, -20, 1, -100)
-TabEmote.Position = UDim2.new(0, 10, 0, 95)
-TabEmote.BackgroundTransparency = 1
-TabEmote.Visible = false
-
-local TabExtras = Instance.new("Frame", MainFrame)
-TabExtras.Size = UDim2.new(1, -20, 1, -100)
-TabExtras.Position = UDim2.new(0, 10, 0, 95)
-TabExtras.BackgroundTransparency = 1
-TabExtras.Visible = false
-
--- ===== ABA MÚSICA =====
-local SearchBoxMusica = Instance.new("TextBox", TabMusica)
-SearchBoxMusica.Size = UDim2.new(1, 0, 0, 35)
-SearchBoxMusica.Position = UDim2.new(0, 0, 0, 0)
-SearchBoxMusica.BackgroundColor3 = CorCartao
-SearchBoxMusica.TextColor3 = CorTexto
-SearchBoxMusica.PlaceholderText = "🔍 Pesquisar música..."
-SearchBoxMusica.Font = Enum.Font.GothamSemibold
-SearchBoxMusica.TextSize = 14
-Instance.new("UICorner", SearchBoxMusica).CornerRadius = UDim.new(0, 6)
-Instance.new("UIStroke", SearchBoxMusica).Color = CorBorda
-
--- Contador de resultados
-local ResultCountLabel = Instance.new("TextLabel", TabMusica)
-ResultCountLabel.Size = UDim2.new(1, 0, 0, 15)
-ResultCountLabel.Position = UDim2.new(0, 0, 0, 38)
-ResultCountLabel.BackgroundTransparency = 1
-ResultCountLabel.Text = "0 músicas"
-ResultCountLabel.TextColor3 = CorTexto
-ResultCountLabel.Font = Enum.Font.GothamSemibold
-ResultCountLabel.TextSize = 10
-ResultCountLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-local ScrollMusica = Instance.new("ScrollingFrame", TabMusica)
-ScrollMusica.Size = UDim2.new(1, 0, 1, -55)
-ScrollMusica.Position = UDim2.new(0, 0, 0, 55)
-ScrollMusica.BackgroundTransparency = 1
-ScrollMusica.ScrollBarThickness = 4
-ScrollMusica.ScrollBarImageColor3 = CorDestaque
-
-local ListLayoutMusica = Instance.new("UIListLayout", ScrollMusica)
-ListLayoutMusica.Padding = UDim.new(0, 8)
-ListLayoutMusica.SortOrder = Enum.SortOrder.LayoutOrder
-
-local function AtualizarListaMusicas(filtro)
-    for _, filho in ipairs(ScrollMusica:GetChildren()) do
-        if filho:IsA("Frame") then
-            filho:Destroy()
-        end
+-- Função para renderizar a lista
+local function RenderList(filtro)
+    -- Limpa
+    for _, child in ipairs(ScrollFrame:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
     end
 
     local itens = 0
     for _, audio in ipairs(Audios) do
-        local nome = audio[1]
-        local id = audio[2]
+        local nome, id = audio[1], audio[2]
         if filtro == "" or string.find(string.lower(nome), string.lower(filtro)) then
-            itens += 1
-            local Item = Instance.new("Frame", ScrollMusica)
+            itens = itens + 1
+            local Item = Instance.new("Frame")
             Item.Size = UDim2.new(1, -10, 0, 45)
-            Item.BackgroundColor3 = CorCartao
+            Item.BackgroundColor3 = Color3.fromRGB(22, 27, 34)
+            Item.Parent = ScrollFrame
             Instance.new("UICorner", Item).CornerRadius = UDim.new(0, 6)
-            Instance.new("UIStroke", Item).Color = CorBorda
 
-            local Label = Instance.new("TextLabel", Item)
+            local Label = Instance.new("TextLabel")
             Label.Size = UDim2.new(0.5, 0, 1, 0)
             Label.Position = UDim2.new(0, 10, 0, 0)
             Label.BackgroundTransparency = 1
             Label.Text = nome
-            Label.TextColor3 = CorTexto
+            Label.TextColor3 = Color3.fromRGB(201, 209, 217)
             Label.Font = Enum.Font.GothamSemibold
             Label.TextSize = 12
             Label.TextXAlignment = Enum.TextXAlignment.Left
+            Label.Parent = Item
 
-            local CopyBtn = Instance.new("TextButton", Item)
+            local CopyBtn = Instance.new("TextButton")
             CopyBtn.Size = UDim2.new(0, 60, 0, 30)
             CopyBtn.Position = UDim2.new(1, -140, 0.5, -15)
             CopyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
             CopyBtn.Text = "COPIAR"
-            CopyBtn.TextColor3 = CorTexto
+            CopyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
             CopyBtn.Font = Enum.Font.GothamBold
             CopyBtn.TextSize = 10
+            CopyBtn.Parent = Item
             Instance.new("UICorner", CopyBtn).CornerRadius = UDim.new(0, 5)
 
             CopyBtn.Activated:Connect(function()
-                local idReal = ObterIdReal(id)
-                if setclipboard then
-                    pcall(setclipboard, idReal)
-                elseif toclipboard then
-                    pcall(toclipboard, idReal)
-                end
-                CopyBtn.BackgroundColor3 = CorVerde
+                if setclipboard then pcall(setclipboard, id) elseif toclipboard then pcall(toclipboard, id) end
+                CopyBtn.BackgroundColor3 = Color3.fromRGB(63, 185, 80)
                 CopyBtn.Text = "✔"
                 task.wait(1)
                 CopyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
                 CopyBtn.Text = "COPIAR"
             end)
 
-            local PlayBtn = Instance.new("TextButton", Item)
+            local PlayBtn = Instance.new("TextButton")
             PlayBtn.Size = UDim2.new(0, 60, 0, 30)
             PlayBtn.Position = UDim2.new(1, -75, 0.5, -15)
-            PlayBtn.BackgroundColor3 = CorDestaque
+            PlayBtn.BackgroundColor3 = Color3.fromRGB(88, 166, 255)
             PlayBtn.Text = "TOCAR"
             PlayBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
             PlayBtn.Font = Enum.Font.GothamBold
             PlayBtn.TextSize = 10
+            PlayBtn.Parent = Item
             Instance.new("UICorner", PlayBtn).CornerRadius = UDim.new(0, 5)
 
             PlayBtn.Activated:Connect(function()
@@ -794,311 +546,22 @@ local function AtualizarListaMusicas(filtro)
         end
     end
 
-    ResultCountLabel.Text = itens .. " música" .. (itens == 1 and "" or "s")
-    ScrollMusica.CanvasSize = UDim2.new(0, 0, 0, itens * 53 + 20)
+    ResultCount.Text = itens .. " música" .. (itens == 1 and "" or "s")
+    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, itens * 53 + 20)
 end
 
-local ultimoFiltro = ""
-SearchBoxMusica:GetPropertyChangedSignal("Text"):Connect(function()
-    local novo = SearchBoxMusica.Text
-    if novo ~= ultimoFiltro then
-        ultimoFiltro = novo
-        task.spawn(function()
-            AtualizarListaMusicas(novo)
-        end)
-    end
+SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+    RenderList(SearchBox.Text)
 end)
 
--- ===== ABA EMOTE =====
-local SearchBoxEmote = Instance.new("TextBox", TabEmote)
-SearchBoxEmote.Size = UDim2.new(1, 0, 0, 35)
-SearchBoxEmote.Position = UDim2.new(0, 0, 0, 0)
-SearchBoxEmote.BackgroundColor3 = CorCartao
-SearchBoxEmote.TextColor3 = CorTexto
-SearchBoxEmote.PlaceholderText = "🔍 Pesquisar emote..."
-SearchBoxEmote.Font = Enum.Font.GothamSemibold
-SearchBoxEmote.TextSize = 14
-Instance.new("UICorner", SearchBoxEmote).CornerRadius = UDim.new(0, 6)
-Instance.new("UIStroke", SearchBoxEmote).Color = CorBorda
-
-local AndarEmoteToggle = Instance.new("TextButton", TabEmote)
-AndarEmoteToggle.Size = UDim2.new(1, 0, 0, 35)
-AndarEmoteToggle.Position = UDim2.new(0, 0, 0, 40)
-AndarEmoteToggle.BackgroundColor3 = CorCartao
-AndarEmoteToggle.Text = "🚶 Andar com emote: OFF"
-AndarEmoteToggle.TextColor3 = CorTexto
-AndarEmoteToggle.Font = Enum.Font.GothamBold
-AndarEmoteToggle.TextSize = 12
-Instance.new("UICorner", AndarEmoteToggle).CornerRadius = UDim.new(0, 6)
-
-AndarEmoteToggle.Activated:Connect(function()
-    AndarComEmote = not AndarComEmote
-    if AndarComEmote then
-        AndarEmoteToggle.Text = "🚶 Andar com emote: ON"
-        AndarEmoteToggle.BackgroundColor3 = CorVerde
-        AndarEmoteToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    else
-        AndarEmoteToggle.Text = "🚶 Andar com emote: OFF"
-        AndarEmoteToggle.BackgroundColor3 = CorCartao
-        AndarEmoteToggle.TextColor3 = CorTexto
-    end
+CloseBtn.Activated:Connect(function()
+    ScreenGui:Destroy()
 end)
 
-local ScrollEmote = Instance.new("ScrollingFrame", TabEmote)
-ScrollEmote.Size = UDim2.new(1, 0, 1, -80)
-ScrollEmote.Position = UDim2.new(0, 0, 0, 85)
-ScrollEmote.BackgroundTransparency = 1
-ScrollEmote.ScrollBarThickness = 4
-ScrollEmote.ScrollBarImageColor3 = CorDestaque
+-- Abrir automaticamente? Sim, abrir
+MainFrame.Visible = true
 
-local ListLayoutEmote = Instance.new("UIListLayout", ScrollEmote)
-ListLayoutEmote.Padding = UDim.new(0, 8)
-ListLayoutEmote.SortOrder = Enum.SortOrder.LayoutOrder
+-- Inicializa
+RenderList("")
 
-local function AtualizarListaEmotes(filtro)
-    for _, filho in ipairs(ScrollEmote:GetChildren()) do
-        if filho:IsA("Frame") then
-            filho:Destroy()
-        end
-    end
-
-    local itens = 0
-    for _, emote in ipairs(Emotes) do
-        local nome = emote[1]
-        local id = emote[2]
-        if filtro == "" or string.find(string.lower(nome), string.lower(filtro)) then
-            itens += 1
-            local Item = Instance.new("Frame", ScrollEmote)
-            Item.Size = UDim2.new(1, -10, 0, 45)
-            Item.BackgroundColor3 = CorCartao
-            Instance.new("UICorner", Item).CornerRadius = UDim.new(0, 6)
-            Instance.new("UIStroke", Item).Color = CorBorda
-
-            local Label = Instance.new("TextLabel", Item)
-            Label.Size = UDim2.new(0.6, 0, 1, 0)
-            Label.Position = UDim2.new(0, 10, 0, 0)
-            Label.BackgroundTransparency = 1
-            Label.Text = nome
-            Label.TextColor3 = CorTexto
-            Label.Font = Enum.Font.GothamSemibold
-            Label.TextSize = 12
-            Label.TextXAlignment = Enum.TextXAlignment.Left
-
-            local PlayEmoteBtn = Instance.new("TextButton", Item)
-            PlayEmoteBtn.Size = UDim2.new(0, 80, 0, 30)
-            PlayEmoteBtn.Position = UDim2.new(1, -90, 0.5, -15)
-            PlayEmoteBtn.BackgroundColor3 = CorDestaque
-            PlayEmoteBtn.Text = "ATIVAR"
-            PlayEmoteBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
-            PlayEmoteBtn.Font = Enum.Font.GothamBold
-            PlayEmoteBtn.TextSize = 10
-            Instance.new("UICorner", PlayEmoteBtn).CornerRadius = UDim.new(0, 5)
-
-            PlayEmoteBtn.Activated:Connect(function()
-                local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    if AndarComEmote then
-                        pcall(function() humanoid:PlayEmoteAndMove(tonumber(id)) end)
-                    else
-                        pcall(function() humanoid:PlayEmote(tonumber(id)) end)
-                    end
-                end
-            end)
-        end
-    end
-
-    ScrollEmote.CanvasSize = UDim2.new(0, 0, 0, itens * 53 + 20)
-end
-
-SearchBoxEmote:GetPropertyChangedSignal("Text"):Connect(function()
-    task.spawn(function()
-        AtualizarListaEmotes(SearchBoxEmote.Text)
-    end)
-end)
-
--- ===== ABA EXTRAS =====
-local LoopToggle = Instance.new("TextButton", TabExtras)
-LoopToggle.Size = UDim2.new(1, 0, 0, 40)
-LoopToggle.Position = UDim2.new(0, 0, 0, 10)
-LoopToggle.BackgroundColor3 = CorCartao
-LoopToggle.Text = "🔁 Loop de música: OFF"
-LoopToggle.TextColor3 = CorTexto
-LoopToggle.Font = Enum.Font.GothamBold
-LoopToggle.TextSize = 12
-Instance.new("UICorner", LoopToggle).CornerRadius = UDim.new(0, 6)
-
-LoopToggle.Activated:Connect(function()
-    LoopMusicaAtivo = not LoopMusicaAtivo
-    if LoopMusicaAtivo then
-        LoopToggle.Text = "🔁 Loop de música: ON"
-        LoopToggle.BackgroundColor3 = CorVerde
-        LoopToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    else
-        LoopToggle.Text = "🔁 Loop de música: OFF"
-        LoopToggle.BackgroundColor3 = CorCartao
-        LoopToggle.TextColor3 = CorTexto
-    end
-end)
-
-local AntiLagToggle = Instance.new("TextButton", TabExtras)
-AntiLagToggle.Size = UDim2.new(1, 0, 0, 40)
-AntiLagToggle.Position = UDim2.new(0, 0, 0, 60)
-AntiLagToggle.BackgroundColor3 = CorCartao
-AntiLagToggle.Text = "🧹 Anti-lag: ON"
-AntiLagToggle.TextColor3 = CorTexto
-AntiLagToggle.Font = Enum.Font.GothamBold
-AntiLagToggle.TextSize = 12
-Instance.new("UICorner", AntiLagToggle).CornerRadius = UDim.new(0, 6)
-
-AntiLagToggle.Activated:Connect(function()
-    AntiLagAtivo = not AntiLagAtivo
-    if AntiLagAtivo then
-        AntiLagToggle.Text = "🧹 Anti-lag: ON"
-        AntiLagToggle.BackgroundColor3 = CorVerde
-        AntiLagToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-        LimparEfeitos()
-    else
-        AntiLagToggle.Text = "🧹 Anti-lag: OFF"
-        AntiLagToggle.BackgroundColor3 = CorCartao
-        AntiLagToggle.TextColor3 = CorTexto
-    end
-end)
-
-local LimparConsoleBtn = Instance.new("TextButton", TabExtras)
-LimparConsoleBtn.Size = UDim2.new(1, 0, 0, 40)
-LimparConsoleBtn.Position = UDim2.new(0, 0, 0, 110)
-LimparConsoleBtn.BackgroundColor3 = CorCartao
-LimparConsoleBtn.Text = "🧽 Limpar Console"
-LimparConsoleBtn.TextColor3 = CorTexto
-LimparConsoleBtn.Font = Enum.Font.GothamBold
-LimparConsoleBtn.TextSize = 12
-Instance.new("UICorner", LimparConsoleBtn).CornerRadius = UDim.new(0, 6)
-
-LimparConsoleBtn.Activated:Connect(function()
-    pcall(function() LogService:ClearOutput() end)
-    pcall(function() collectgarbage("collect") end)
-    LimparConsoleBtn.Text = "✅ Console limpo!"
-    task.wait(1)
-    LimparConsoleBtn.Text = "🧽 Limpar Console"
-end)
-
--- Botão anti-remoção da Boombox
-local BoomboxToggle = Instance.new("TextButton", TabExtras)
-BoomboxToggle.Size = UDim2.new(1, 0, 0, 40)
-BoomboxToggle.Position = UDim2.new(0, 0, 0, 160)
-BoomboxToggle.BackgroundColor3 = CorCartao
-BoomboxToggle.Text = "📻 Anti-remoção Boombox: OFF"
-BoomboxToggle.TextColor3 = CorTexto
-BoomboxToggle.Font = Enum.Font.GothamBold
-BoomboxToggle.TextSize = 12
-Instance.new("UICorner", BoomboxToggle).CornerRadius = UDim.new(0, 6)
-
-BoomboxToggle.Activated:Connect(function()
-    BoomboxAntiRemoverAtivo = not BoomboxAntiRemoverAtivo
-    if BoomboxAntiRemoverAtivo then
-        BoomboxToggle.Text = "📻 Anti-remoção Boombox: ON"
-        BoomboxToggle.BackgroundColor3 = CorVerde
-        BoomboxToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-        -- Inicia o loop anti-remoção
-        task.spawn(function()
-            while BoomboxAntiRemoverAtivo do
-                pcall(EquiparBoombox)
-                task.wait(0.01) -- ultra rápido
-            end
-        end)
-    else
-        BoomboxToggle.Text = "📻 Anti-remoção Boombox: OFF"
-        BoomboxToggle.BackgroundColor3 = CorCartao
-        BoomboxToggle.TextColor3 = CorTexto
-    end
-end)
-
--- ==========================================
--- ⚙️ FUNÇÃO EQUIPAR BOOMBOX
--- ==========================================
-function EquiparBoombox()
-    local char = Player.Character
-    if not char then return end
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
-    local backpack = Player:FindFirstChild("Backpack")
-    if not backpack then return end
-
-    -- Verifica se já está equipada
-    local equipped = false
-    for _, tool in ipairs(char:GetChildren()) do
-        if tool:IsA("Tool") and tool.Name == "Boombox" then
-            equipped = true
-            break
-        end
-    end
-    if equipped then return end
-
-    -- Se não está equipada, tenta equipar do backpack
-    local boombox = backpack:FindFirstChild("Boombox")
-    if boombox and boombox:IsA("Tool") then
-        humanoid:EquipTool(boombox)
-    end
-end
-
--- ==========================================
--- ⚙️ TROCAR DE ABAS
--- ==========================================
-local function TrocarAba(aba)
-    TabMusica.Visible = (aba == "musica")
-    TabEmote.Visible = (aba == "emote")
-    TabExtras.Visible = (aba == "extras")
-
-    BtnMusica.BackgroundColor3 = (aba == "musica") and CorDestaque or CorCartao
-    BtnMusica.TextColor3 = (aba == "musica") and Color3.fromRGB(0,0,0) or CorTexto
-    BtnEmote.BackgroundColor3 = (aba == "emote") and CorDestaque or CorCartao
-    BtnEmote.TextColor3 = (aba == "emote") and Color3.fromRGB(0,0,0) or CorTexto
-    BtnExtras.BackgroundColor3 = (aba == "extras") and CorDestaque or CorCartao
-    BtnExtras.TextColor3 = (aba == "extras") and Color3.fromRGB(0,0,0) or CorTexto
-end
-
-BtnMusica.Activated:Connect(function() TrocarAba("musica") end)
-BtnEmote.Activated:Connect(function() TrocarAba("emote") end)
-BtnExtras.Activated:Connect(function() TrocarAba("extras") end)
-
--- Inicializa listas
-AtualizarListaMusicas("")
-AtualizarListaEmotes("")
-
--- ==========================================
--- ⚙️ MOVIMENTAÇÃO E ABERTURA
--- ==========================================
-local isMainOpen = false
-local function ToggleMain()
-    isMainOpen = not isMainOpen
-    MainFrame.Visible = isMainOpen
-    if isMainOpen then
-        AtualizarListaMusicas(ultimoFiltro)
-        AtualizarListaEmotes(SearchBoxEmote.Text)
-    end
-end
-CloseBtn.Activated:Connect(ToggleMain)
-ToggleBtn.Activated:Connect(ToggleMain)
-
--- Arrastar janela pelo topo
-local dragMainToggle, dragMainStart, startMainPos
-TopBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragMainToggle, dragMainStart, startMainPos = true, input.Position, MainFrame.Position
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if dragMainToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - dragMainStart
-        MainFrame.Position = UDim2.new(startMainPos.X.Scale, startMainPos.X.Offset + delta.X, startMainPos.Y.Scale, startMainPos.Y.Offset + delta.Y)
-    end
-end)
-TopBar.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragMainToggle = false
-    end
-end)
-
--- Aplicar anti-lag inicial
-LimparEfeitos()
-print("👑 Imperial Audio Hub carregado com sucesso!")
+print("🎵 Sistema de música carregado!")
