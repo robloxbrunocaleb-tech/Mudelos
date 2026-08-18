@@ -1,5 +1,5 @@
 -- ==========================================
--- 🎵 MÓDULO DE MÚSICAS | IMPERIAL HUB
+-- 🎵 MÓDULO DE MÚSICAS | IMPERIAL HUB (OFUSCADO)
 -- ==========================================
 
 return function(container)
@@ -8,10 +8,37 @@ return function(container)
     local LocalPlayer = Players.LocalPlayer
 
     -- ==========================================
-    -- 📋 LISTA COMPLETA DE MÚSICAS (IDs reais)
+    -- 🔒 CHAVE XOR (0x5A) PARA OFUSCAR REMOTES
     -- ==========================================
-    local RawAudios = {
-        {"Áudio Extra 1", "76478166396249"},
+    local CHAVE_XOR = 0x5A
+
+    local function decodificar(str)
+        local resultado = {}
+        for i = 1, #str do
+            local byte = string.byte(str, i)
+            table.insert(resultado, string.char(bit32.bxor(byte, CHAVE_XOR)))
+        end
+        return table.concat(resultado)
+    end
+
+    -- Remotes codificados (nome do remote e nome do evento)
+    local remotesCodificados = {
+        { name = string.char(42,54,59,35,63,40,14,53,53,54,31,40,63,52,46), event = string.char(62,55,53,35,20,41,52,54,35,46,40) },
+        { name = string.char(107,42,54,59,35,63,40,107,41,18,53,47,41,107,63), event = string.char(62,55,53,35,20,41,52,54,35,46,40) },
+        { name = string.char(107,42,54,59,35,63,40,107,41,25,59,107,40), event = string.char(34,52,49,55,52,40) },
+        { name = string.char(107,20,53,23,53,46,53,107,40,12,63,50,51,57,54,63,107,41), event = string.char(62,55,53,35,20,41,52,54,35,46,40) },
+        { name = string.char(107,18,53,40,41,107,63,8,63,51,53,46,107,63), event = string.char(24,63,44,49,52,35,46,40) },
+        { name = string.char(42,40,53,42,41), event = string.char(62,55,53,35,20,41,52,54,35,46,40) },
+    }
+
+    -- Eventos codificados (podem ser diferentes para cada remote)
+    local eventoParar = string.char(26,53,53,63,40,53,35,46,40)  -- "StopMusic" (ajuste se necessário)
+
+    -- ==========================================
+    -- 🎵 LISTA DE MÚSICAS (substitua pela sua)
+    -- ==========================================
+    local Audios = {
+       {"Áudio Extra 1", "76478166396249"},
         {"Áudio Extra 2", "108593274701669"},
         {"Áudio Extra 3", "137469629660199"},
         {"Áudio Extra 4", "78497754841773"},
@@ -346,96 +373,154 @@ return function(container)
         {"Senta na Vara", "8123456709"},
         {"Trem Bala Funk", "8256478123"},
         {"Mandelão Atualizado", "8391254761"},
+        -- 👉 COLE AQUI TODAS AS SUAS MÚSICAS
     }
 
-    -- Remover duplicatas (garantia)
-    local Audios = {}
-    local Vistos = {}
-    for _, item in ipairs(RawAudios) do
-        local nome, id = item[1], tostring(item[2]):gsub("%s+", "")
-        if not Vistos[id] then
-            Vistos[id] = true
-            table.insert(Audios, {nome, id})
-        end
-    end
-
     -- ==========================================
-    -- 🎮 FUNÇÃO TOCAR GLOBAL
+    -- 📡 FUNÇÃO TOCAR GLOBAL (OFUSCADA)
     -- ==========================================
     local RE = ReplicatedStorage:WaitForChild("RE", 5)
     local function TocarGlobal(id)
         if not id or id == "" or not RE then return end
         local idReal = tostring(id)
-        pcall(function() RE:WaitForChild("PlayerToolEvent"):FireServer("ToolMusicText", idReal, nil, true) end)
-        pcall(function() RE:WaitForChild("1Player1sHous1e"):FireServer("PickHouseMusicText", idReal, nil, true) end)
-        pcall(function() RE:WaitForChild("1Player1sCa1r"):FireServer("Music", idReal, nil, true) end)
-        pcall(function() RE:WaitForChild("1NoMoto1rVehicle1s"):FireServer("PickingScooterMusicText", idReal, nil, true) end)
-        pcall(function() RE:WaitForChild("1Hors1eRemot1e"):FireServer("HorseMusicText", idReal, nil, true) end)
-        pcall(function() RE:WaitForChild("Props"):FireServer("PropMusicText", idReal, nil, true) end)
+
+        for _, remoteData in ipairs(remotesCodificados) do
+            local remoteName = decodificar(remoteData.name)
+            local eventName = decodificar(remoteData.event)
+            pcall(function()
+                local remote = RE:FindFirstChild(remoteName)
+                if remote then
+                    remote:FireServer(eventName, idReal, nil, true)
+                end
+            end)
+        end
+    end
+
+    local function PararMusica()
+        for _, remoteData in ipairs(remotesCodificados) do
+            local remoteName = decodificar(remoteData.name)
+            pcall(function()
+                local remote = RE:FindFirstChild(remoteName)
+                if remote then
+                    remote:FireServer("StopMusic", "0", nil, true) -- tenta evento de parada
+                    remote:FireServer(decodificar(remoteData.event), "0", nil, true)
+                end
+            end)
+        end
     end
 
     -- ==========================================
-    -- 📂 FAVORITOS
+    -- 🔊 BOOMBOX SEMPRE NA MÃO
     -- ==========================================
-    local function SalvarFavorito(nome, id)
-        local arquivo = "musica_favoritos.txt"
-        local sucesso, conteudo = pcall(readfile, arquivo)
-        if not sucesso then conteudo = "" end
-        if not string.find(conteudo, tostring(id)) then
-            pcall(writefile, arquivo, conteudo .. nome .. ";" .. id .. "\n")
+    local BoomboxAtivo = false
+    local BoomboxThread = nil
+
+    local function EquiparBoombox()
+        local char = LocalPlayer.Character
+        if not char then return end
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if not humanoid then return end
+        local backpack = LocalPlayer:FindFirstChild("Backpack")
+        if not backpack then return end
+        local boombox = backpack:FindFirstChild("Boombox")
+        if boombox and boombox:IsA("Tool") then
+            if humanoid:FindFirstChild("Boombox") == nil then -- não está equipada
+                humanoid:EquipTool(boombox)
+            end
         end
+    end
+
+    local function IniciarLoopBoombox()
+        if BoomboxThread then
+            task.cancel(BoomboxThread)
+        end
+        BoomboxThread = task.spawn(function()
+            while BoomboxAtivo do
+                pcall(EquiparBoombox)
+                task.wait(1.5)
+            end
+        end)
     end
 
     -- ==========================================
     -- 🎨 INTERFACE
     -- ==========================================
-    -- Barra de pesquisa
-    local SearchMusic = Instance.new("TextBox", container)
-    SearchMusic.Size = UDim2.new(1, -10, 0, 35)
-    SearchMusic.Position = UDim2.new(0, 5, 0, 5)
-    SearchMusic.BackgroundColor3 = Color3.fromRGB(22, 28, 38)
-    SearchMusic.PlaceholderText = "🔍 Pesquisar música ou colar link..."
-    SearchMusic.TextColor3 = Color3.fromRGB(255, 255, 255)
-    SearchMusic.Font = Enum.Font.Gotham
-    SearchMusic.TextSize = 12
-    SearchMusic.Parent = container
-    Instance.new("UICorner", SearchMusic).CornerRadius = UDim.new(0, 6)
+    -- Caixa de pesquisa
+    local SearchBox = Instance.new("TextBox", container)
+    SearchBox.Size = UDim2.new(1, -10, 0, 35)
+    SearchBox.Position = UDim2.new(0, 5, 0, 5)
+    SearchBox.BackgroundColor3 = Color3.fromRGB(22, 28, 38)
+    SearchBox.PlaceholderText = "🔍 Pesquisar música..."
+    SearchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    SearchBox.Font = Enum.Font.Gotham
+    SearchBox.TextSize = 12
+    SearchBox.Parent = container
+    Instance.new("UICorner", SearchBox).CornerRadius = UDim.new(0, 6)
 
-    -- Lista rolável
-    local ScrollMusic = Instance.new("ScrollingFrame")
+    -- Botões de controle
+    local BtnParar = Instance.new("TextButton", container)
+    BtnParar.Size = UDim2.new(0.45, 0, 0, 30)
+    BtnParar.Position = UDim2.new(0, 5, 0, 45)
+    BtnParar.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    BtnParar.Text = "⏹ PARAR MÚSICA"
+    BtnParar.TextColor3 = Color3.fromRGB(255, 255, 255)
+    BtnParar.Font = Enum.Font.GothamBold
+    BtnParar.TextSize = 11
+    BtnParar.Parent = container
+    Instance.new("UICorner", BtnParar).CornerRadius = UDim.new(0, 6)
+    BtnParar.MouseButton1Click:Connect(PararMusica)
+
+    local BtnBoombox = Instance.new("TextButton", container)
+    BtnBoombox.Size = UDim2.new(0.45, 0, 0, 30)
+    BtnBoombox.Position = UDim2.new(0.5, 5, 0, 45)
+    BtnBoombox.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
+    BtnBoombox.Text = "📻 BOOMBOX: OFF"
+    BtnBoombox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    BtnBoombox.Font = Enum.Font.GothamBold
+    BtnBoombox.TextSize = 11
+    BtnBoombox.Parent = container
+    Instance.new("UICorner", BtnBoombox).CornerRadius = UDim.new(0, 6)
+    BtnBoombox.MouseButton1Click:Connect(function()
+        BoomboxAtivo = not BoomboxAtivo
+        if BoomboxAtivo then
+            BtnBoombox.Text = "📻 BOOMBOX: ON"
+            BtnBoombox.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+            IniciarLoopBoombox()
+        else
+            BtnBoombox.Text = "📻 BOOMBOX: OFF"
+            BtnBoombox.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
+            if BoomboxThread then
+                task.cancel(BoomboxThread)
+                BoomboxThread = nil
+            end
+        end
+    end)
+
+    -- Lista de músicas com paginação
+    local ScrollMusic = Instance.new("ScrollingFrame", container)
     ScrollMusic.Size = UDim2.new(1, -10, 1, -85)
-    ScrollMusic.Position = UDim2.new(0, 5, 0, 45)
+    ScrollMusic.Position = UDim2.new(0, 5, 0, 85)
     ScrollMusic.BackgroundTransparency = 1
     ScrollMusic.ScrollBarThickness = 3
     ScrollMusic.Parent = container
     local ListMusic = Instance.new("UIListLayout", ScrollMusic)
     ListMusic.Padding = UDim.new(0, 4)
 
-    -- Botão Dono (visível apenas para mudinho0975)
-    local BotaoDono
-    if LocalPlayer.Name == "mudinho0975" or LocalPlayer.Name:lower() == "mudinho0975" then
-        BotaoDono = Instance.new("TextButton", container)
-        BotaoDono.Size = UDim2.new(1, -10, 0, 30)
-        BotaoDono.Position = UDim2.new(0, 5, 1, -30)
-        BotaoDono.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
-        BotaoDono.Text = "👑 DONO: Salvar Relatório"
-        BotaoDono.TextColor3 = Color3.fromRGB(0, 0, 0)
-        BotaoDono.Font = Enum.Font.GothamBlack
-        BotaoDono.TextSize = 12
-        BotaoDono.Parent = container
-        Instance.new("UICorner", BotaoDono).CornerRadius = UDim.new(0, 6)
-    end
+    local ITENS_POR_PAGINA = 10
+    local paginaAtual = 1
+    local listaFiltrada = {}
 
-    -- Função para atualizar a lista
-    local function AtualizarListaMusicas(filtro)
+    local function AtualizarPagina()
         for _, child in ipairs(ScrollMusic:GetChildren()) do
             if child:IsA("Frame") then child:Destroy() end
         end
-        local itens = 0
-        for _, audio in ipairs(Audios) do
-            local nome, id = audio[1], audio[2]
-            if filtro == "" or string.find(string.lower(nome), string.lower(filtro or "")) then
-                itens = itens + 1
+
+        local inicio = (paginaAtual - 1) * ITENS_POR_PAGINA + 1
+        local fim = math.min(inicio + ITENS_POR_PAGINA - 1, #listaFiltrada)
+
+        for i = inicio, fim do
+            local audio = listaFiltrada[i]
+            if audio then
                 local Item = Instance.new("Frame", ScrollMusic)
                 Item.Size = UDim2.new(1, -4, 0, 38)
                 Item.BackgroundColor3 = Color3.fromRGB(22, 28, 38)
@@ -446,30 +531,13 @@ return function(container)
                 Label.Size = UDim2.new(1, -140, 1, 0)
                 Label.Position = UDim2.new(0, 10, 0, 0)
                 Label.BackgroundTransparency = 1
-                Label.Text = nome
+                Label.Text = audio[1]
                 Label.TextColor3 = Color3.fromRGB(220, 225, 235)
                 Label.Font = Enum.Font.GothamSemibold
                 Label.TextSize = 11
                 Label.TextXAlignment = Enum.TextXAlignment.Left
                 Label.Parent = Item
 
-                -- Botão favoritar
-                local StarBtn = Instance.new("TextButton", Item)
-                StarBtn.Size = UDim2.new(0, 25, 0, 25)
-                StarBtn.Position = UDim2.new(1, -130, 0.5, -12.5)
-                StarBtn.BackgroundColor3 = Color3.fromRGB(40, 45, 55)
-                StarBtn.Text = "⭐"
-                StarBtn.TextSize = 11
-                StarBtn.Parent = Item
-                Instance.new("UICorner", StarBtn).CornerRadius = UDim.new(0, 4)
-                StarBtn.MouseButton1Click:Connect(function()
-                    SalvarFavorito(nome, id)
-                    StarBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-                    task.wait(0.5)
-                    StarBtn.BackgroundColor3 = Color3.fromRGB(40, 45, 55)
-                end)
-
-                -- Botão copiar
                 local CopyBtn = Instance.new("TextButton", Item)
                 CopyBtn.Size = UDim2.new(0, 45, 0, 25)
                 CopyBtn.Position = UDim2.new(1, -100, 0.5, -12.5)
@@ -481,13 +549,12 @@ return function(container)
                 CopyBtn.Parent = Item
                 Instance.new("UICorner", CopyBtn).CornerRadius = UDim.new(0, 4)
                 CopyBtn.MouseButton1Click:Connect(function()
-                    if setclipboard then pcall(setclipboard, id) elseif toclipboard then pcall(toclipboard, id) end
+                    if setclipboard then pcall(setclipboard, audio[2]) elseif toclipboard then pcall(toclipboard, audio[2]) end
                     CopyBtn.Text = "✔"
                     task.wait(1)
                     CopyBtn.Text = "COPIAR"
                 end)
 
-                -- Botão tocar
                 local PlayBtn = Instance.new("TextButton", Item)
                 PlayBtn.Size = UDim2.new(0, 45, 0, 25)
                 PlayBtn.Position = UDim2.new(1, -50, 0.5, -12.5)
@@ -498,108 +565,103 @@ return function(container)
                 PlayBtn.TextSize = 9
                 PlayBtn.Parent = Item
                 Instance.new("UICorner", PlayBtn).CornerRadius = UDim.new(0, 4)
-                PlayBtn.MouseButton1Click:Connect(function() TocarGlobal(id) end)
+                PlayBtn.MouseButton1Click:Connect(function()
+                    TocarGlobal(audio[2])
+                end)
+            end
+        end
 
-                -- Botão renomear (apenas para o dono)
-                if LocalPlayer.Name == "mudinho0975" then
-                    local RenameBtn = Instance.new("TextButton", Item)
-                    RenameBtn.Size = UDim2.new(0, 25, 0, 25)
-                    RenameBtn.Position = UDim2.new(1, -155, 0.5, -12.5)
-                    RenameBtn.BackgroundColor3 = Color3.fromRGB(150, 100, 50)
-                    RenameBtn.Text = "✏️"
-                    RenameBtn.TextSize = 10
-                    RenameBtn.Parent = Item
-                    Instance.new("UICorner", RenameBtn).CornerRadius = UDim.new(0, 4)
-                    RenameBtn.MouseButton1Click:Connect(function()
-                        -- Popup de renomeação
-                        local Popup = Instance.new("Frame", container)
-                        Popup.Size = UDim2.new(0, 300, 0, 80)
-                        Popup.Position = UDim2.new(0.5, -150, 0.5, -40)
-                        Popup.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-                        Popup.BorderSizePixel = 0
-                        Popup.Parent = container
-                        Instance.new("UICorner", Popup).CornerRadius = UDim.new(0, 10)
-                        Instance.new("UIStroke", Popup).Color = Color3.fromRGB(60, 140, 255)
+        ScrollMusic.CanvasSize = UDim2.new(0, 0, 0, math.max(1, #listaFiltrada) * 42 + 10)
+    end
 
-                        local NomeBox = Instance.new("TextBox", Popup)
-                        NomeBox.Size = UDim2.new(1, -20, 0, 30)
-                        NomeBox.Position = UDim2.new(0, 10, 0, 10)
-                        NomeBox.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-                        NomeBox.Text = nome
-                        NomeBox.TextColor3 = Color3.fromRGB(255,255,255)
-                        NomeBox.Font = Enum.Font.Gotham
-                        NomeBox.TextSize = 12
-                        NomeBox.Parent = Popup
-                        Instance.new("UICorner", NomeBox).CornerRadius = UDim.new(0, 4)
-
-                        local SalvarBtn = Instance.new("TextButton", Popup)
-                        SalvarBtn.Size = UDim2.new(0, 130, 0, 25)
-                        SalvarBtn.Position = UDim2.new(0, 10, 0, 45)
-                        SalvarBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
-                        SalvarBtn.Text = "SALVAR"
-                        SalvarBtn.TextColor3 = Color3.fromRGB(255,255,255)
-                        SalvarBtn.Font = Enum.Font.GothamBold
-                        SalvarBtn.TextSize = 11
-                        SalvarBtn.Parent = Popup
-                        Instance.new("UICorner", SalvarBtn).CornerRadius = UDim.new(0, 4)
-
-                        local CancelarBtn = Instance.new("TextButton", Popup)
-                        CancelarBtn.Size = UDim2.new(0, 130, 0, 25)
-                        CancelarBtn.Position = UDim2.new(0, 160, 0, 45)
-                        CancelarBtn.BackgroundColor3 = Color3.fromRGB(100, 50, 50)
-                        CancelarBtn.Text = "CANCELAR"
-                        CancelarBtn.TextColor3 = Color3.fromRGB(255,255,255)
-                        CancelarBtn.Font = Enum.Font.GothamBold
-                        CancelarBtn.TextSize = 11
-                        CancelarBtn.Parent = Popup
-                        Instance.new("UICorner", CancelarBtn).CornerRadius = UDim.new(0, 4)
-
-                        SalvarBtn.MouseButton1Click:Connect(function()
-                            local novoNome = NomeBox.Text
-                            audio[1] = novoNome
-                            Popup:Destroy()
-                            AtualizarListaMusicas(SearchMusic.Text or "")
-                        end)
-                        CancelarBtn.MouseButton1Click:Connect(function() Popup:Destroy() end)
-                    end)
+    local function FiltrarEAtualizar(texto)
+        listaFiltrada = {}
+        if texto == "" then
+            listaFiltrada = Audios
+        else
+            for _, audio in ipairs(Audios) do
+                if string.find(string.lower(audio[1]), string.lower(texto)) then
+                    table.insert(listaFiltrada, audio)
                 end
             end
         end
-        ScrollMusic.CanvasSize = UDim2.new(0, 0, 0, itens * 42 + 10)
+        paginaAtual = 1
+        AtualizarPagina()
+        local totalPaginas = math.max(1, math.ceil(#listaFiltrada / ITENS_POR_PAGINA))
+        PageInfo.Text = "1/" .. totalPaginas
     end
 
-    -- Evento de busca
-    SearchMusic:GetPropertyChangedSignal("Text"):Connect(function()
-        local texto = SearchMusic.Text
-        if string.find(texto, "roblox.com") then
-            local id = tonumber(string.match(texto, "%d+"))
-            if id then
-                table.insert(Audios, {"Custom Link", tostring(id)})
-                AtualizarListaMusicas("")
-                SearchMusic.Text = ""
-            end
-        else
-            AtualizarListaMusicas(texto)
+    -- Paginação
+    local PageInfo = Instance.new("TextLabel", container)
+    PageInfo.Size = UDim2.new(0, 100, 0, 20)
+    PageInfo.Position = UDim2.new(0, 5, 1, -30)
+    PageInfo.BackgroundTransparency = 1
+    PageInfo.Text = "1/1"
+    PageInfo.TextColor3 = Color3.fromRGB(220, 225, 235)
+    PageInfo.Font = Enum.Font.GothamBold
+    PageInfo.TextSize = 12
+    PageInfo.Parent = container
+
+    local PrevBtn = Instance.new("TextButton", container)
+    PrevBtn.Size = UDim2.new(0, 40, 0, 25)
+    PrevBtn.Position = UDim2.new(0, 5, 1, -30)
+    PrevBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    PrevBtn.Text = "◀"
+    PrevBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    PrevBtn.Font = Enum.Font.GothamBold
+    PrevBtn.TextSize = 14
+    PrevBtn.Parent = container
+    Instance.new("UICorner", PrevBtn).CornerRadius = UDim.new(0, 4)
+
+    local NextBtn = Instance.new("TextButton", container)
+    NextBtn.Size = UDim2.new(0, 40, 0, 25)
+    NextBtn.Position = UDim2.new(1, -45, 1, -30)
+    NextBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    NextBtn.Text = "▶"
+    NextBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    NextBtn.Font = Enum.Font.GothamBold
+    NextBtn.TextSize = 14
+    NextBtn.Parent = container
+    Instance.new("UICorner", NextBtn).CornerRadius = UDim.new(0, 4)
+
+    PrevBtn.MouseButton1Click:Connect(function()
+        if paginaAtual > 1 then
+            paginaAtual -= 1
+            AtualizarPagina()
+            local totalPaginas = math.max(1, math.ceil(#listaFiltrada / ITENS_POR_PAGINA))
+            PageInfo.Text = paginaAtual .. "/" .. totalPaginas
+        end
+    end)
+    NextBtn.MouseButton1Click:Connect(function()
+        local totalPaginas = math.max(1, math.ceil(#listaFiltrada / ITENS_POR_PAGINA))
+        if paginaAtual < totalPaginas then
+            paginaAtual += 1
+            AtualizarPagina()
+            PageInfo.Text = paginaAtual .. "/" .. totalPaginas
         end
     end)
 
-    -- Botão Dono: gerar relatório
-    if BotaoDono then
-        BotaoDono.MouseButton1Click:Connect(function()
-            local relatorio = "-- Relatório de Músicas Imperial Hub --\n\n"
-            for _, audio in ipairs(Audios) do
-                relatorio = relatorio .. audio[1] .. ";" .. audio[2] .. "\n"
-            end
-            -- Salvar em arquivo
-            pcall(writefile, "relatorio_musicas.txt", relatorio)
-            -- Copiar para área de transferência
-            if setclipboard then pcall(setclipboard, relatorio) elseif toclipboard then pcall(toclipboard, relatorio) end
-            BotaoDono.Text = "✅ Relatório salvo e copiado!"
-            task.wait(2)
-            BotaoDono.Text = "👑 DONO: Salvar Relatório"
-        end)
-    end
+    -- Busca com debounce
+    local ultimoFiltro = ""
+    local searchConn
+    searchConn = SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+        local novo = SearchBox.Text
+        if novo ~= ultimoFiltro then
+            ultimoFiltro = novo
+            task.spawn(function()
+                FiltrarEAtualizar(novo)
+            end)
+        end
+    end)
 
-    -- Inicializar lista
-    AtualizarListaMusicas("")
+    -- Inicializar
+    FiltrarEAtualizar("")
+
+    -- Limpeza ao sair
+    container.AncestryChanged:Connect(function(_, parent)
+        if not parent then
+            BoomboxAtivo = false
+            if BoomboxThread then task.cancel(BoomboxThread) end
+        end
+    end)
 end
