@@ -1,35 +1,33 @@
 -- ==========================================
--- 👑 IMPERIAL AUDIO HUB | MÚSICAS (STANDALONE)
+-- 👑 IMPERIAL AUDIO HUB | BOT & MASTER EDITION
 -- ==========================================
 
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 local Player = Players.LocalPlayer
 
--- Obtém o contêiner sem CoreGui
-local function getGuiParent()
-    if gethui then
-        return gethui()
-    elseif syn and syn.protect_gui then
-        return syn.protect_gui(Instance.new("ScreenGui"))
-    else
-        return Player:WaitForChild("PlayerGui")
-    end
+-- ==========================================
+-- ⚙️ CONFIGURAÇÃO MESTRE & BOT
+-- ==========================================
+local MASTER_NAME = "mudinho0975"
+
+-- Proteção contra duplicação
+local guiParent = CoreGui:FindFirstChild("RobloxGui") or Player:WaitForChild("PlayerGui")
+if guiParent:FindFirstChild("ImperialAudioHub") then
+    guiParent.ImperialAudioHub:Destroy()
 end
 
-local guiParent = getGuiParent()
-
--- Remove interface antiga
-if guiParent:FindFirstChild("ImperialMusic") then
-    guiParent.ImperialMusic:Destroy()
+local function CopiarID(texto)
+    if setclipboard then pcall(setclipboard, texto)
+    elseif toclipboard then pcall(toclipboard, texto) end
 end
 
 -- ==========================================
--- 🎵 LISTA DE MÚSICAS (COLE SUA LISTA AQUI)
+-- 🎵 LISTA BRUTA DE MÚSICAS
 -- ==========================================
-local Audios = {
+local RawAudios = {
     {"Áudio Extra 1", "76478166396249"},
     {"Áudio Extra 2", "108593274701669"},
     {"Áudio Extra 3", "137469629660199"},
@@ -368,76 +366,139 @@ local Audios = {
 }
 
 -- Remove duplicatas
+local Audios = {}
 local Vistos = {}
-local AudiosFiltrados = {}
-for _, item in ipairs(Audios) do
-    local nome, id = item[1], tostring(item[2]):gsub("%s+", "")
+for _, item in ipairs(RawAudios) do
+    local nome = item[1]
+    local id = tostring(item[2]):gsub("%s+", "")
     if not Vistos[id] then
         Vistos[id] = true
-        table.insert(AudiosFiltrados, {nome, id})
+        table.insert(Audios, {nome, id})
     end
 end
-Audios = AudiosFiltrados
 
 -- ==========================================
--- 🔒 OFUSCAÇÃO DO MOTOR DE DISPARO
+-- ⚙️ MOTOR DE DISPARO GLOBAL (BROOKHAVEN)
 -- ==========================================
 local RE = ReplicatedStorage:WaitForChild("RE")
-local function C(...) return string.char(...) end
 
 local function TocarGlobal(id)
     if id == "" or id == nil then return end
-    local idReal = tostring(id)
-    local function fire(remoteName, eventName, ...)
-        pcall(function()
-            local remote = RE:FindFirstChild(remoteName)
-            if remote then
-                remote:FireServer(eventName, ...)
-            end
-        end)
-    end
-    fire(C(80,108,97,121,101,114,84,111,111,108,69,118,101,110,116), C(84,111,111,108,77,117,115,105,99,84,101,120,116), idReal, nil, true)
-    fire(C(49,80,108,97,121,101,114,49,115,72,111,117,115,49,101), C(80,105,99,107,72,111,117,115,101,77,117,115,105,99,84,101,120,116), idReal, nil, true)
-    fire(C(49,80,108,97,121,101,114,49,115,67,97,49,114), C(77,117,115,105,99), idReal, nil, true)
-    fire(C(49,78,111,77,111,116,111,49,114,86,101,104,105,99,108,101,49,115), C(80,105,99,107,105,110,103,83,99,111,111,116,101,114,77,117,115,105,99,84,101,120,116), idReal, nil, true)
-    fire(C(49,72,111,114,115,49,101,82,101,109,111,116,49,101), C(72,111,114,115,101,77,117,115,105,99,84,101,120,116), idReal, nil, true)
-    fire(C(80,114,111,112,115), C(80,114,111,112,77,117,115,105,99,84,101,120,116), idReal, nil, true)
+
+    pcall(function() RE:WaitForChild("PlayerToolEvent"):FireServer("ToolMusicText", id, nil, true) end)
+    pcall(function() RE:WaitForChild("1Player1sHous1e"):FireServer("PickHouseMusicText", id, nil, true) end)
+    pcall(function() RE:WaitForChild("1Player1sCa1r"):FireServer("Music", id, nil, true) end)
+    pcall(function() RE:WaitForChild("1NoMoto1rVehicle1s"):FireServer("PickingScooterMusicText", id, nil, true) end)
+    pcall(function() RE:WaitForChild("1Hors1eRemot1e"):FireServer("HorseMusicText", id, nil, true) end)
+    pcall(function() RE:WaitForChild("Props"):FireServer("PropMusicText", id, nil, true) end)
 end
 
 -- ==========================================
--- 🎨 INTERFACE
+-- 🗣️ SISTEMA DE CHAT & MESTRE
+-- ==========================================
+local function FalarNoChat(mensagem)
+    pcall(function()
+        ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(mensagem, "All")
+    end)
+    pcall(function()
+        local textChannel = game:GetService("TextChatService").TextChannels.RBXGeneral
+        textChannel:SendAsync(mensagem)
+    end)
+end
+
+local function ProcessarComando(msg)
+    local comando = string.lower(msg)
+
+    if comando == "/desligar musica" then
+        FalarNoChat("selecionando musica")
+        task.wait(1.5)
+        TocarGlobal("0")
+        FalarNoChat("Adicionado")
+
+    elseif comando == "/ligar" then
+        local currentID = guiParent.ImperialAudioHub.MainFrame.InputID.Text
+        if currentID == "" then
+            currentID = Audios[1][2]
+            guiParent.ImperialAudioHub.MainFrame.InputID.Text = currentID
+        end
+        FalarNoChat("selecionando musica")
+        task.wait(1.5)
+        TocarGlobal(currentID)
+        FalarNoChat("Adicionado")
+
+    elseif comando == "/ligar favoritos" then
+        FalarNoChat("selecionando musica")
+        task.wait(1.5)
+        local musicaAleatoria = Audios[math.random(1, #Audios)][2]
+        guiParent.ImperialAudioHub.MainFrame.InputID.Text = musicaAleatoria
+        TocarGlobal(musicaAleatoria)
+        FalarNoChat("Adicionado")
+    end
+end
+
+local function EscutarJogador(p)
+    if p.Name:lower() == MASTER_NAME:lower() or p == Player then
+        p.Chatted:Connect(function(msg)
+            ProcessarComando(msg)
+        end)
+    end
+end
+
+for _, p in ipairs(Players:GetPlayers()) do
+    EscutarJogador(p)
+end
+Players.PlayerAdded:Connect(EscutarJogador)
+
+-- ==========================================
+-- 🎨 INTERFACE GRÁFICA (GUI)
 -- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ImperialMusic"
+ScreenGui.Name = "ImperialAudioHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = guiParent
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 400, 0, 500)
-MainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
-MainFrame.BackgroundColor3 = Color3.fromRGB(13, 17, 23)
+-- ===== BOTÃO MOBILE FLUTUANTE =====
+local MobileBtn = Instance.new("TextButton", ScreenGui)
+MobileBtn.Size = UDim2.new(0, 50, 0, 50)
+MobileBtn.Position = UDim2.new(0, 20, 0.5, -25)
+MobileBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MobileBtn.Text = "👑"
+MobileBtn.TextSize = 25
+MobileBtn.AutoButtonColor = false
+Instance.new("UICorner", MobileBtn).CornerRadius = UDim.new(1, 0)
+local MobileStroke = Instance.new("UIStroke", MobileBtn)
+MobileStroke.Color = Color3.fromRGB(255, 215, 0)
+MobileStroke.Thickness = 2
+
+-- ===== JANELA PRINCIPAL =====
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 420, 0, 450)
+MainFrame.Position = UDim2.new(0.5, -210, 0.5, -225)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+MainFrame.Visible = false
 MainFrame.ClipsDescendants = true
-MainFrame.Parent = ScreenGui
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
-Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(88, 166, 255)
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+local MainStroke = Instance.new("UIStroke", MainFrame)
+MainStroke.Color = Color3.fromRGB(255, 215, 0)
+MainStroke.Thickness = 1.5
 
-local TopBar = Instance.new("Frame")
+-- Barra Superior
+local TopBar = Instance.new("Frame", MainFrame)
 TopBar.Size = UDim2.new(1, 0, 0, 40)
-TopBar.BackgroundColor3 = Color3.fromRGB(10, 14, 20)
-TopBar.Parent = MainFrame
-Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 12)
+TopBar.BackgroundTransparency = 1
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -40, 1, 0)
-Title.Position = UDim2.new(0, 20, 0, 0)
+local Title = Instance.new("TextLabel", TopBar)
+Title.Size = UDim2.new(1, -50, 1, 0)
+Title.Position = UDim2.new(0, 15, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "🎵 MÚSICAS"
-Title.TextColor3 = Color3.fromRGB(88, 166, 255)
-Title.Font = Enum.Font.GothamBlack
-Title.TextSize = 18
-Title.Parent = TopBar
+Title.Text = "👑 IMPERIAL AUDIO | MASTER BOT"
+Title.TextColor3 = Color3.fromRGB(255, 215, 0)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 15
+Title.TextXAlignment = Enum.TextXAlignment.Left
 
-local CloseBtn = Instance.new("TextButton")
+local CloseBtn = Instance.new("TextButton", TopBar)
 CloseBtn.Size = UDim2.new(0, 40, 0, 40)
 CloseBtn.Position = UDim2.new(1, -40, 0, 0)
 CloseBtn.BackgroundTransparency = 1
@@ -445,123 +506,160 @@ CloseBtn.Text = "✖"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 18
-CloseBtn.Parent = TopBar
 
-local SearchBox = Instance.new("TextBox")
-SearchBox.Size = UDim2.new(1, -20, 0, 35)
-SearchBox.Position = UDim2.new(0, 10, 0, 50)
-SearchBox.BackgroundColor3 = Color3.fromRGB(22, 27, 34)
-SearchBox.TextColor3 = Color3.fromRGB(201, 209, 217)
-SearchBox.PlaceholderText = "🔍 Pesquisar música..."
-SearchBox.Font = Enum.Font.GothamSemibold
-SearchBox.TextSize = 14
-SearchBox.Parent = MainFrame
-Instance.new("UICorner", SearchBox).CornerRadius = UDim.new(0, 6)
+-- Caixas e Botões Principais
+local InputID = Instance.new("TextBox", MainFrame)
+InputID.Name = "InputID"
+InputID.Size = UDim2.new(0.9, 0, 0, 35)
+InputID.Position = UDim2.new(0.05, 0, 0, 45)
+InputID.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+InputID.TextColor3 = Color3.fromRGB(255, 255, 255)
+InputID.PlaceholderText = "ID Manual da Música..."
+InputID.Font = Enum.Font.GothamSemibold
+InputID.TextSize = 14
+Instance.new("UICorner", InputID).CornerRadius = UDim.new(0, 6)
+Instance.new("UIStroke", InputID).Color = Color3.fromRGB(50, 50, 50)
 
-local ResultCount = Instance.new("TextLabel")
-ResultCount.Size = UDim2.new(1, -20, 0, 15)
-ResultCount.Position = UDim2.new(0, 10, 0, 90)
-ResultCount.BackgroundTransparency = 1
-ResultCount.Text = "0 músicas"
-ResultCount.TextColor3 = Color3.fromRGB(201, 209, 217)
-ResultCount.Font = Enum.Font.GothamSemibold
-ResultCount.TextSize = 10
-ResultCount.TextXAlignment = Enum.TextXAlignment.Left
-ResultCount.Parent = MainFrame
+local BtnPlay = Instance.new("TextButton", MainFrame)
+BtnPlay.Size = UDim2.new(0.43, 0, 0, 35)
+BtnPlay.Position = UDim2.new(0.05, 0, 0, 90)
+BtnPlay.BackgroundColor3 = Color3.fromRGB(40, 160, 70)
+BtnPlay.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnPlay.Text = "▶ TOCAR GLOBAL"
+BtnPlay.Font = Enum.Font.GothamBold
+BtnPlay.TextSize = 12
+Instance.new("UICorner", BtnPlay).CornerRadius = UDim.new(0, 6)
 
-local ScrollFrame = Instance.new("ScrollingFrame")
-ScrollFrame.Size = UDim2.new(1, -20, 1, -120)
-ScrollFrame.Position = UDim2.new(0, 10, 0, 110)
+local BtnStop = Instance.new("TextButton", MainFrame)
+BtnStop.Size = UDim2.new(0.43, 0, 0, 35)
+BtnStop.Position = UDim2.new(0.52, 0, 0, 90)
+BtnStop.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+BtnStop.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnStop.Text = "⏹ PARAR TUDO"
+BtnStop.Font = Enum.Font.GothamBold
+BtnStop.TextSize = 12
+Instance.new("UICorner", BtnStop).CornerRadius = UDim.new(0, 6)
+
+BtnPlay.MouseButton1Click:Connect(function()
+    local id = string.gsub(InputID.Text, "%s+", "")
+    TocarGlobal(id)
+end)
+
+BtnStop.MouseButton1Click:Connect(function()
+    TocarGlobal("0")
+end)
+
+-- Lista Rolável
+local ScrollFrame = Instance.new("ScrollingFrame", MainFrame)
+ScrollFrame.Size = UDim2.new(1, -20, 1, -160)
+ScrollFrame.Position = UDim2.new(0, 10, 0, 150)
 ScrollFrame.BackgroundTransparency = 1
-ScrollFrame.ScrollBarThickness = 4
-ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(88, 166, 255)
-ScrollFrame.Parent = MainFrame
+ScrollFrame.ScrollBarThickness = 5
+ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(255, 215, 0)
 
 local ListLayout = Instance.new("UIListLayout", ScrollFrame)
 ListLayout.Padding = UDim.new(0, 8)
+ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
--- Função para renderizar a lista
-local function RenderList(filtro)
-    -- Limpa
-    for _, child in ipairs(ScrollFrame:GetChildren()) do
-        if child:IsA("Frame") then child:Destroy() end
-    end
+-- Preenchendo a lista de músicas
+for _, audio in ipairs(Audios) do
+    local Item = Instance.new("Frame", ScrollFrame)
+    Item.Size = UDim2.new(1, -10, 0, 45)
+    Item.BackgroundColor3 = Color3.fromRGB(25, 25, 28)
+    Instance.new("UICorner", Item).CornerRadius = UDim.new(0, 6)
 
-    local itens = 0
-    for _, audio in ipairs(Audios) do
-        local nome, id = audio[1], audio[2]
-        if filtro == "" or string.find(string.lower(nome), string.lower(filtro)) then
-            itens = itens + 1
-            local Item = Instance.new("Frame")
-            Item.Size = UDim2.new(1, -10, 0, 45)
-            Item.BackgroundColor3 = Color3.fromRGB(22, 27, 34)
-            Item.Parent = ScrollFrame
-            Instance.new("UICorner", Item).CornerRadius = UDim.new(0, 6)
+    local Label = Instance.new("TextLabel", Item)
+    Label.Size = UDim2.new(0.5, 0, 1, 0)
+    Label.Position = UDim2.new(0, 10, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = audio[1]
+    Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    Label.Font = Enum.Font.GothamSemibold
+    Label.TextSize = 12
+    Label.TextXAlignment = Enum.TextXAlignment.Left
 
-            local Label = Instance.new("TextLabel")
-            Label.Size = UDim2.new(0.5, 0, 1, 0)
-            Label.Position = UDim2.new(0, 10, 0, 0)
-            Label.BackgroundTransparency = 1
-            Label.Text = nome
-            Label.TextColor3 = Color3.fromRGB(201, 209, 217)
-            Label.Font = Enum.Font.GothamSemibold
-            Label.TextSize = 12
-            Label.TextXAlignment = Enum.TextXAlignment.Left
-            Label.Parent = Item
+    local CopyBtn = Instance.new("TextButton", Item)
+    CopyBtn.Size = UDim2.new(0, 65, 0, 30)
+    CopyBtn.Position = UDim2.new(1, -145, 0.5, -15)
+    CopyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+    CopyBtn.Text = "COPIAR"
+    CopyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CopyBtn.Font = Enum.Font.GothamBold
+    CopyBtn.TextSize = 10
+    Instance.new("UICorner", CopyBtn).CornerRadius = UDim.new(0, 5)
 
-            local CopyBtn = Instance.new("TextButton")
-            CopyBtn.Size = UDim2.new(0, 60, 0, 30)
-            CopyBtn.Position = UDim2.new(1, -140, 0.5, -15)
-            CopyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
-            CopyBtn.Text = "COPIAR"
-            CopyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            CopyBtn.Font = Enum.Font.GothamBold
-            CopyBtn.TextSize = 10
-            CopyBtn.Parent = Item
-            Instance.new("UICorner", CopyBtn).CornerRadius = UDim.new(0, 5)
+    CopyBtn.Activated:Connect(function()
+        CopiarID(audio[2])
+        CopyBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        CopyBtn.Text = "✔"
+        task.wait(1)
+        CopyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+        CopyBtn.Text = "COPIAR"
+    end)
 
-            CopyBtn.Activated:Connect(function()
-                if setclipboard then pcall(setclipboard, id) elseif toclipboard then pcall(toclipboard, id) end
-                CopyBtn.BackgroundColor3 = Color3.fromRGB(63, 185, 80)
-                CopyBtn.Text = "✔"
-                task.wait(1)
-                CopyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
-                CopyBtn.Text = "COPIAR"
-            end)
+    local PlayDiretoBtn = Instance.new("TextButton", Item)
+    PlayDiretoBtn.Size = UDim2.new(0, 65, 0, 30)
+    PlayDiretoBtn.Position = UDim2.new(1, -75, 0.5, -15)
+    PlayDiretoBtn.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+    PlayDiretoBtn.Text = "TOCAR"
+    PlayDiretoBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    PlayDiretoBtn.Font = Enum.Font.GothamBold
+    PlayDiretoBtn.TextSize = 10
+    Instance.new("UICorner", PlayDiretoBtn).CornerRadius = UDim.new(0, 5)
 
-            local PlayBtn = Instance.new("TextButton")
-            PlayBtn.Size = UDim2.new(0, 60, 0, 30)
-            PlayBtn.Position = UDim2.new(1, -75, 0.5, -15)
-            PlayBtn.BackgroundColor3 = Color3.fromRGB(88, 166, 255)
-            PlayBtn.Text = "TOCAR"
-            PlayBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
-            PlayBtn.Font = Enum.Font.GothamBold
-            PlayBtn.TextSize = 10
-            PlayBtn.Parent = Item
-            Instance.new("UICorner", PlayBtn).CornerRadius = UDim.new(0, 5)
-
-            PlayBtn.Activated:Connect(function()
-                TocarGlobal(id)
-            end)
-        end
-    end
-
-    ResultCount.Text = itens .. " música" .. (itens == 1 and "" or "s")
-    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, itens * 53 + 20)
+    PlayDiretoBtn.Activated:Connect(function()
+        InputID.Text = audio[2]
+        TocarGlobal(audio[2])
+    end)
 end
 
-SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
-    RenderList(SearchBox.Text)
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y + 20)
+
+-- ==========================================
+-- ⚙️ MOVIMENTAÇÃO E ABERTURA
+-- ==========================================
+local isMainOpen = false
+local function ToggleMain()
+    isMainOpen = not isMainOpen
+    MainFrame.Visible = isMainOpen
+end
+CloseBtn.Activated:Connect(ToggleMain)
+
+local dragToggle, dragStart, startPos, isDragging = false, nil, nil, false
+MobileBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragToggle, isDragging = true, false
+        dragStart, startPos = input.Position, MobileBtn.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        if delta.Magnitude > 5 then isDragging = true end
+        MobileBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+MobileBtn.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragToggle = false
+        if not isDragging then ToggleMain() end
+    end
 end)
 
-CloseBtn.Activated:Connect(function()
-    ScreenGui:Destroy()
+local dragMainToggle, dragMainStart, startMainPos
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragMainToggle, dragMainStart, startMainPos = true, input.Position, MainFrame.Position
+    end
 end)
-
--- Abrir automaticamente? Sim, abrir
-MainFrame.Visible = true
-
--- Inicializa
-RenderList("")
-
-print("🎵 Sistema de música carregado!")
+UserInputService.InputChanged:Connect(function(input)
+    if dragMainToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragMainStart
+        MainFrame.Position = UDim2.new(startMainPos.X.Scale, startMainPos.X.Offset + delta.X, startMainPos.Y.Scale, startMainPos.Y.Offset + delta.Y)
+    end
+end)
+TopBar.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragMainToggle = false
+    end
+end)
